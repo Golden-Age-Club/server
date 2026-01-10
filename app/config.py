@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_HOURS: int = Field(default=24)
     
     # CORS
-    ALLOWED_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8000")
+    ALLOWED_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8000,http://localhost:5173,https://pghome.co")
     
     # Authentication
     AUTH_EXPIRATION_SECONDS: int = Field(default=86400)
