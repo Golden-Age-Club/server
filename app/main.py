@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -12,11 +13,9 @@ import logging
 
 settings = get_settings()
 
-# Setup logging
 setup_logging(log_level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
@@ -32,14 +31,11 @@ app = FastAPI(
     },
 )
 
-# Add request ID middleware (first, so it wraps everything)
 app.add_middleware(RequestIDMiddleware)
 
-# Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS middleware with restricted origins
 allowed_origins = settings.ALLOWED_ORIGINS.split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -49,7 +45,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Event handlers
+async def keep_alive_loop():
+    while True:
+        try:
+            db = await get_database()
+            await db.command("ping")
+            logger.debug("Keep-alive ping executed")
+        except Exception as e:
+            logger.error(f"Keep-alive error: {e}")
+        await asyncio.sleep(1)
+
+
 @app.on_event("startup")
 async def startup_db_client():
     logger.info("🚀 Starting Golden Age USDT Wallet API...")
@@ -58,11 +64,19 @@ async def startup_db_client():
     logger.info(f"Allowed origins: {allowed_origins}")
     logger.info(f"Log level: {settings.LOG_LEVEL}")
     logger.info(f"Log format: {settings.LOG_FORMAT}")
+    app.state.keep_alive_task = asyncio.create_task(keep_alive_loop())
     logger.info("✅ Application started successfully")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     logger.info("Shutting down application...")
+    keep_alive_task = getattr(app.state, "keep_alive_task", None)
+    if keep_alive_task is not None:
+        keep_alive_task.cancel()
+        try:
+            await keep_alive_task
+        except Exception:
+            pass
     await close_mongo_connection()
     logger.info("✅ Application shutdown complete")
 
