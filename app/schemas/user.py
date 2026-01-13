@@ -16,7 +16,9 @@ class TelegramAuthRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """User profile response schema"""
-    telegram_id: int
+    id: str = Field(..., alias="_id")
+    telegram_id: Optional[int] = None
+    email: Optional[str] = None
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -73,3 +75,17 @@ class UserCreateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     language_code: Optional[str] = "en"
+
+
+class EmailLoginRequest(BaseModel):
+    """Request schema for Email authentication"""
+    email: str
+    password: str
+
+
+class EmailRegisterRequest(BaseModel):
+    """Request schema for Email registration"""
+    email: str
+    password: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None

@@ -8,9 +8,10 @@ from app.dependencies import get_transaction_repo, get_user_repo
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/webhook", tags=["webhook"])
+router = APIRouter(tags=["webhook"])
 
-@router.post("/ccpayment")
+@router.post("/api/webhook/ccpayment")
+@router.post("/api/callback")
 async def ccpayment_webhook(
     request: Request,
     transaction_repo: TransactionRepository = Depends(get_transaction_repo),

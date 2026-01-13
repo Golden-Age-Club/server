@@ -79,16 +79,18 @@ async def get_current_user_from_token(
     
     # Verify token
     payload = verify_access_token(token)
+    user_id = payload.get("user_id")
     telegram_id = payload.get("telegram_id")
     
-    if not telegram_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-    
-    # Get user from database
-    user = await user_repo.get_by_telegram_id(telegram_id)
+    user = None
+    if user_id:
+        user = await user_repo.get_by_id(user_id)
+    elif telegram_id:
+        # Fallback for old tokens
+        user = await user_repo.get_by_telegram_id(telegram_id)
     
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="User not found or invalid token payload")
     
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="User account is inactive")

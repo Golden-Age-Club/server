@@ -4,7 +4,9 @@ from pydantic import BaseModel, Field
 
 class User(BaseModel):
     """User model with Telegram-specific fields"""
-    telegram_id: int
+    telegram_id: Optional[int] = None
+    email: Optional[str] = None
+    password_hash: Optional[str] = None
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None

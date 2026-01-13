@@ -20,8 +20,11 @@ async def init_indexes(db: AsyncIOMotorDatabase):
         # Users collection indexes
         logger.info("Creating users collection indexes...")
         
-        # Unique index on telegram_id (already used as _id, but explicit for clarity)
-        await db.users.create_index("telegram_id", unique=True)
+        # Unique sparse index on telegram_id (sparse=True allows multiple users without telegram_id)
+        await db.users.create_index("telegram_id", unique=True, sparse=True)
+        
+        # Unique sparse index on email for lookups and security
+        await db.users.create_index("email", unique=True, sparse=True)
         
         # Index on username for lookups
         await db.users.create_index("username", sparse=True)

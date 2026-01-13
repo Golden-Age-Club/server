@@ -47,8 +47,8 @@ async def create_deposit(
             detail=f"Maximum deposit amount is {MAX_DEPOSIT_AMOUNT} USDT"
         )
     
-    # Use authenticated user's telegram_id instead of user_id from request
-    user_id = str(current_user["telegram_id"])
+    # Use authenticated user's internal ID
+    user_id = str(current_user["_id"])
     
     logger.info(f"Deposit request: user={user_id}, amount={request.amount}, currency={request.currency}")
     
@@ -99,8 +99,8 @@ async def create_withdrawal(
             detail=f"Maximum withdrawal amount is {MAX_WITHDRAWAL_AMOUNT} USDT"
         )
     
-    # Use authenticated user's telegram_id instead of user_id from request
-    user_id = str(current_user["telegram_id"])
+    # Use authenticated user's internal ID
+    user_id = str(current_user["_id"])
     
     logger.info(f"Withdrawal request: user={user_id}, amount={request.amount}, address={request.wallet_address}")
     
@@ -129,7 +129,7 @@ async def get_balance(
     user_repo: UserRepository = Depends(get_user_repo)
 ):
     """Get current user's balance (requires authentication)"""
-    user_id = str(current_user["telegram_id"])
+    user_id = str(current_user["_id"])
     balance = await user_repo.get_balance(user_id)
     return BalanceResponse(user_id=user_id, balance=balance)
 
@@ -140,7 +140,7 @@ async def get_transactions(
     transaction_repo: TransactionRepository = Depends(get_transaction_repo)
 ):
     """Get current user's transaction history (requires authentication)"""
-    user_id = str(current_user["telegram_id"])
+    user_id = str(current_user["_id"])
     transactions = await transaction_repo.get_user_transactions(user_id, limit)
     return {"user_id": user_id, "transactions": transactions}
 
@@ -157,7 +157,7 @@ async def get_transaction_status(
         raise HTTPException(status_code=404, detail="Transaction not found")
     
     # Verify transaction belongs to current user
-    if transaction["user_id"] != str(current_user["telegram_id"]):
+    if transaction["user_id"] != str(current_user["_id"]):
         raise HTTPException(status_code=403, detail="Access denied to this transaction")
     
     return transaction
