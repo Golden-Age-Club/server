@@ -43,6 +43,7 @@ class UserUpdateView(LoginRequiredMixin, FormView):
         user = UserRepository.get_user_by_id(user_id)
         if user:
             return {
+                "username": user.get("username"),
                 "first_name": user.get("first_name"),
                 "last_name": user.get("last_name"),
                 "is_active": user.get("is_active", True),

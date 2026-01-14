@@ -32,10 +32,10 @@ class UserRepository:
         """Create a new user (Email)"""
         user_doc = {
             "email": user_data["email"],
+            "username": user_data["username"],
             "password_hash": user_data["password_hash"],
-            # Do NOT include telegram_id: None, as it violates unique sparse index if multiple users have None
-            "first_name": user_data.get("first_name"),
-            "last_name": user_data.get("last_name"),
+            "first_name": user_data["first_name"],
+            "last_name": user_data["last_name"],
             "language_code": "en",
             "balance": 0.0,
             "is_active": True,
@@ -56,6 +56,11 @@ class UserRepository:
     async def get_by_email(self, email: str) -> Optional[dict]:
         """Get user by Email"""
         user = await self.collection.find_one({"email": email})
+        return user
+
+    async def get_by_username(self, username: str) -> Optional[dict]:
+        """Get user by Username"""
+        user = await self.collection.find_one({"username": username})
         return user
     
     async def get_by_id(self, user_id: str) -> Optional[dict]:

@@ -1,8 +1,9 @@
 from django import forms
 
 class UserEditForm(forms.Form):
-    first_name = forms.CharField(required=False)
-    last_name = forms.CharField(required=False)
+    username = forms.CharField(required=True)
+    first_name = forms.CharField(required=True)
+    last_name = forms.CharField(required=True)
     is_active = forms.BooleanField(required=False, label="Active Status")
     is_premium = forms.BooleanField(required=False, label="Premium User")
     

@@ -71,15 +71,22 @@ async def register_email(
     request: EmailRegisterRequest,
     user_repo: UserRepository = Depends(get_user_repo)
 ):
-    """Register new user with Email/Password"""
+    """Register new user with Email/Password and Username"""
     from passlib.hash import bcrypt
     
-    existing = await user_repo.get_by_email(request.email)
-    if existing:
+    # Check email
+    existing_email = await user_repo.get_by_email(request.email)
+    if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Check username
+    existing_username = await user_repo.get_by_username(request.username)
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
     
     user_data = {
         "email": request.email,
+        "username": request.username,
         "password_hash": bcrypt.hash(request.password),
         "first_name": request.first_name,
         "last_name": request.last_name

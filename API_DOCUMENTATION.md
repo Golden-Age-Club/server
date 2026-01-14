@@ -19,11 +19,12 @@ The API uses JWT (JSON Web Token) for authentication. Most endpoints require the
 
 ### 2. Email Registration
 *   **Endpoint:** `POST /api/auth/register/email`
-*   **Description:** Creates a new account using email and password.
+*   **Description:** Creates a new account with mandatory profile details.
 *   **Body:**
     ```json
     {
         "email": "user@example.com",
+        "username": "johndoe123",
         "password": "strongpassword",
         "first_name": "John",
         "last_name": "Doe"

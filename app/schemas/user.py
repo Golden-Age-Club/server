@@ -87,5 +87,6 @@ class EmailRegisterRequest(BaseModel):
     """Request schema for Email registration"""
     email: str
     password: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    username: str
+    first_name: str
+    last_name: str
