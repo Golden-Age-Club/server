@@ -75,6 +75,8 @@ async def shutdown_db_client():
         keep_alive_task.cancel()
         try:
             await keep_alive_task
+        except asyncio.CancelledError:
+            logger.debug("Keep-alive task cancelled")
         except Exception:
             pass
     await close_mongo_connection()
