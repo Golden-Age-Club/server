@@ -64,3 +64,16 @@ logs/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Temporary / Test Scripts
+debug_*.py
+test_*.py
+verify_*.py
+simulate_*.py
+send_test_ticket.py
+generate_token.py
+get_valid_token.py
+create_confirmation_ticket.py
+token.txt
+db_verification.log
+
