@@ -54,15 +54,19 @@ def verify_access_token(token: str) -> Dict:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
 async def get_current_user_from_token(
-    authorization: str = Header(...),
+    creds: HTTPAuthorizationCredentials = Depends(security),
     user_repo: UserRepository = Depends(get_user_repo)
 ) -> Dict:
     """
     Get current user from JWT token in Authorization header
     
     Args:
-        authorization: Authorization header with Bearer token
+        creds: HTTPBearer credentials
         user_repo: User repository dependency
     
     Returns:
@@ -71,11 +75,8 @@ async def get_current_user_from_token(
     Raises:
         HTTPException: If authentication fails
     """
-    # Check if authorization header has Bearer token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header format")
-    
-    token = authorization.replace("Bearer ", "")
+    # token is automatically extracted by HTTPBearer
+    token = creds.credentials
     
     # Verify token
     payload = verify_access_token(token)
@@ -121,10 +122,57 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    if authorization and authorization.startswith("Bearer "):
-        return await get_current_user_from_token(authorization, user_repo)
-    
+    if authorization:
+        # Backward compatibility or manual header usage
+        if authorization.startswith("Bearer "):
+            token = authorization.replace("Bearer ", "")
+            # Verify and return... duplication of logic.
+            # Best to reuse get_current_user_from_token logic but we can't easily await dependency.
+            # So we will just call the token verifier.
+            
+            payload = verify_access_token(token)
+            user_id = payload.get("user_id")
+            
+            user = await user_repo.get_by_id(user_id)
+            if not user:
+                 raise HTTPException(status_code=401, detail="User not found")
+                 
+            if not user.get("is_active", True):
+                raise HTTPException(status_code=401, detail="User account is inactive")
+                
+            if user.get("_id"):
+                user["_id"] = str(user["_id"])
+            return user
+            
     raise HTTPException(
         status_code=401,
         detail="Authentication required. Provide Authorization: Bearer <token>"
     )
+
+async def verify_jwt_token_safe(token: str) -> Optional[Dict]:
+    """
+    Verify token and return user WITHOUT raising exceptions.
+    Used for WebSockets where we want to close connection gracefully.
+    """
+    try:
+        # 1. Decode token
+        payload = verify_access_token(token)
+        user_id = payload.get("user_id")
+        
+        if not user_id:
+            return None
+            
+        # 2. Get User Repo (Manual instantiation since we are outside dependency chain often)
+        # Note: Ideally we pass this in. For MVP speed we do this:
+        from app.core.database import get_database
+        db = await get_database()
+        user_repo = UserRepository(db)
+        
+        # 3. Get User
+        user = await user_repo.get_by_id(user_id)
+        if user and user.get("_id"):
+            user["_id"] = str(user["_id"])
+            
+        return user
+    except Exception:
+        return None
