@@ -41,12 +41,12 @@ class TicketChatView(AdminRequiredMixin, TemplateView):
         # For MVP, we'll use a mocked or static token if env allows, 
         # or implement a simple token generator in Django that FastAPI accepts.
         # For now, placeholder:
-        context['admin_ws_token'] = "admin-bypass-token" 
+        import os
+        context['admin_ws_token'] = os.getenv("ADMIN_WS_SECRET", "admin-bypass-token")
         
         # WEBSOCKET URL
         # Logic: If API_URL env var is set (Prod), use it. Else default to localhost.
         # This handles the split-server setup on Render.
-        import os
         api_url = os.getenv('API_URL')
         
         if api_url:
