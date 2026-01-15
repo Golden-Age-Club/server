@@ -95,6 +95,9 @@ async def get_current_user_from_token(
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="User account is inactive")
     
+    if user.get("_id") is not None:
+        user["_id"] = str(user["_id"])
+    
     return user
 
 
