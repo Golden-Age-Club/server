@@ -23,6 +23,7 @@ class UnifiedCallbackRequest(BaseModel):
     signature: str
 
 @router.post("/api/v1/callback/unified")
+@router.post("/api/callback") # Alias to support the URL user registered
 async def unified_callback(
     request: Request,
     user_repo: UserRepository = Depends(get_user_repo)
