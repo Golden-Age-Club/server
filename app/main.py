@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
-from app.routes import wallet, webhook, auth
+from app.routes import wallet, webhook, auth, casino, unified_callback
 from app.config import get_settings
 import logging
 
@@ -86,6 +86,8 @@ async def shutdown_db_client():
 app.include_router(auth.router)
 app.include_router(wallet.router)
 app.include_router(webhook.router)
+app.include_router(casino.router)
+app.include_router(unified_callback.router)
 
 @app.get("/")
 async def root():

@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     CCPAYMENT_APP_SECRET: str = Field(default="test_secret")
     CCPAYMENT_API_URL: str = Field(default="https://admin.ccpayment.com/ccpayment/v2")
     
+    # Casino games provider (PG)
+    PG_APP_NAME: str = Field(default="Golden Age Club")
+    PG_APP_ID: str = Field(default="test_pg_app_id")
+    PG_API_KEY: str = Field(default="test_pg_api_key")
+    PG_API_BASE_URL: str = Field(default="https://mgc-example.com")
+    
     # MongoDB
     MONGODB_URL: str = Field(default="mongodb://localhost:27017")
     DATABASE_NAME: str = Field(default="casino_db")
@@ -30,6 +36,9 @@ class Settings(BaseSettings):
     
     # CORS
     ALLOWED_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8000,http://localhost:5173,https://pghome.co")
+    
+    # Frontend
+    FRONTEND_URL: str = Field(default="http://localhost:5173")
     
     # Authentication
     AUTH_EXPIRATION_SECONDS: int = Field(default=86400)
