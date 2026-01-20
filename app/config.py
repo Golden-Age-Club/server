@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = Field(default="console")  # 'json' for production, 'console' for development
     
     # Support System
-    ADMIN_WS_SECRET: str = Field(min_length=8) # Required in Prod
+    ADMIN_WS_SECRET: str = Field(default="admin_secret_key_123", min_length=8) # Required in Prod
     
     class Config:
         env_file = ".env"
