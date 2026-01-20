@@ -55,7 +55,7 @@
                             </td>
                             <td>{{ user.created_at|date:"M d, Y" }}</td>
                             <td>
-                                <a href="{% url 'web:user_edit' user.id %}" class="btn btn-sm btn-info">
+                                <a href="{% url 'web:user_detail' user.id %}" class="btn btn-sm btn-info">
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
                                 <form action="{% url 'web:user_toggle' user.id %}" method="post"

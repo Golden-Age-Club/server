@@ -7,14 +7,24 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
-from app.routes import wallet, webhook, auth, casino, unified_callback
+from app.routes import wallet, webhook, auth,support,  casino, unified_callback
 from app.config import get_settings
 import logging
 
+from fastapi.security import HTTPBearer
+
 settings = get_settings()
+security = HTTPBearer()
+
+# Add to verify_jwt_token logic or app description later?
+# Easiest is to add it to routes or global dependency if we want the lock icon for everything.
+# But for now, let's just use it in main.py to hint OpenAPI.
 
 setup_logging(log_level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
 logger = logging.getLogger(__name__)
+
+# ... (omitted)
+
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -88,6 +98,7 @@ app.include_router(wallet.router)
 app.include_router(webhook.router)
 app.include_router(casino.router)
 app.include_router(unified_callback.router)
+app.include_router(support.router)
 
 @app.get("/")
 async def root():
