@@ -24,6 +24,7 @@ class UnifiedCallbackRequest(BaseModel):
 
 @router.post("/api/v1/callback/unified")
 @router.post("/api/callback") # Alias to support the URL user registered
+@router.post("/webhook") # Exact match for code sample expectation
 async def unified_callback(
     request: Request,
     user_repo: UserRepository = Depends(get_user_repo)
@@ -32,14 +33,17 @@ async def unified_callback(
         # Get raw body for signature verification if needed, or just use JSON
         body = await request.json()
         
-        # Log the incoming request
-        logger.info(f"Callback received: {body}")
+        # Log the incoming request - CRITICAL for debugging
+        logger.info(f"🔔 WEBHOOK RECEIVED at {request.url.path}")
+        logger.info(f"📦 Payload: {json.dumps(body, indent=2)}")
         
         cmd = body.get('cmd')
         player_token = body.get('player_token')
         currency_id = body.get('currencyId')
         request_time = body.get('request_time')
         signature = body.get('signature')
+        
+        logger.info(f"➡️ Processing command: {cmd}")
         
         # Verify Signature
         # Note: We need to verify how the provider generates the signature for callbacks.
