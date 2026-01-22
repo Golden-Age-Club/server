@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
-from app.routes import wallet, webhook, auth,support,  casino, unified_callback
+from app.routes import wallet, webhook, auth, support, casino, unified_callback
 from app.config import get_settings
 import logging
 
@@ -55,17 +55,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-async def keep_alive_loop():
-    while True:
-        try:
-            db = await get_database()
-            await db.command("ping")
-            logger.debug("Keep-alive ping executed")
-        except Exception as e:
-            logger.error(f"Keep-alive error: {e}")
-        await asyncio.sleep(1)
-
-
 @app.on_event("startup")
 async def startup_db_client():
     logger.info("🚀 Starting Golden Age USDT Wallet API...")
@@ -74,21 +63,12 @@ async def startup_db_client():
     logger.info(f"Allowed origins: {allowed_origins}")
     logger.info(f"Log level: {settings.LOG_LEVEL}")
     logger.info(f"Log format: {settings.LOG_FORMAT}")
-    app.state.keep_alive_task = asyncio.create_task(keep_alive_loop())
+    # Removed aggressive keep-alive loop to prevent resource exhaustion
     logger.info("✅ Application started successfully")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     logger.info("Shutting down application...")
-    keep_alive_task = getattr(app.state, "keep_alive_task", None)
-    if keep_alive_task is not None:
-        keep_alive_task.cancel()
-        try:
-            await keep_alive_task
-        except asyncio.CancelledError:
-            logger.debug("Keep-alive task cancelled")
-        except Exception:
-            pass
     await close_mongo_connection()
     logger.info("✅ Application shutdown complete")
 
