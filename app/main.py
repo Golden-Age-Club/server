@@ -11,6 +11,7 @@ from app.routes import wallet, webhook, auth, support, casino, unified_callback
 from app.config import get_settings
 import logging
 
+
 from fastapi.security import HTTPBearer
 
 settings = get_settings()
