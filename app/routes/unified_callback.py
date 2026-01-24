@@ -29,7 +29,6 @@ import uuid
 async def unified_callbackw(request: Request, user_repo: UserRepository = Depends(get_user_repo)):
     try:
         body = await request.json()
-        print(body)
         cmd = body.get('cmd')
         player_token = body.get('player_token')
     
@@ -58,6 +57,15 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
 
         # 2. HANDLE COMMANDS
         if cmd == 'getPlayerInfo' or cmd == 'getBalance':
+            print({  "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "currency": "USD",
+                "balance": float(user.get("balance", 0)),
+                "display_name": user.get("username", "Player"),
+                "gender": "m",
+                "country": "US",
+                "player_id": str(user["_id"])})
             return {
                 "result": True,
                 "err_desc": "OK",
@@ -71,10 +79,15 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
             }
 
         elif cmd == 'deposit':
-            amount = float(body.get('amount', 0))
+            # "deposit" usually means the player WON (money comes IN to the wallet)
+            # Log shows: 'winAmount': 0 (or >0 if win), 'betInfo': '...'
+            amount = float(body.get('winAmount', 0))
+            
             before_balance = float(user.get("balance", 0))
             new_balance = await user_repo.update_balance(str(user["_id"]), amount)
-            tx_id = f"dep_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            
+            # Use provided transactionId or generate one
+            tx_id = body.get('transactionId') or f"dep_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
             
             return {
                 "result": True,
@@ -86,14 +99,17 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
             }
 
         elif cmd == 'withdraw':
-            amount = float(body.get('amount', 0))
+            # "withdraw" usually means the player BET (money goes OUT of the wallet)
+            # Log shows: 'betAmount': 100
+            amount = float(body.get('betAmount', 0))
+            
             before_balance = float(user.get("balance", 0))
             try:
                 new_balance = await user_repo.deduct_balance(str(user["_id"]), amount)
             except HTTPException:
                 return {"result": False, "err_desc": "Insufficient balance", "err_code": 100}
                 
-            tx_id = f"wd_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            tx_id = body.get('transactionId') or f"wd_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
             
             return {
                 "result": True,
@@ -105,12 +121,25 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
             }
 
         elif cmd == 'rollback':
-            # Rollback usually implies refunding a bet or reversing a transaction
-            # Assuming positive amount means adding back to balance
-            amount = float(body.get('amount', 0))
+            # Rollback: Refund a previous transaction (usually a bet/withdraw)
+            # Log shows: 'transactionId', but amount might not be explicit in simple rollback
+            # However, typically rollback includes the amount to refund or we might need to look it up.
+            # Based on logs provided, rollback doesn't show amount, but let's check standard PG/MGC logic.
+            # Usually rollback provides 'betAmount' or 'amount' to refund.
+            # If not present, we might need to assume it's full refund or handle 0 safely.
+            # Let's check if 'betAmount' or 'amount' is in body for rollback.
+            # If strictly following logs: {'cmd': 'rollback', ...} no amount shown in your snippet.
+            # But normally rollback cancels a bet, so we should ADD back the money.
+            
+            # SAFELY GET AMOUNT:
+            amount = float(body.get('betAmount', 0)) # Try betAmount first (common in bet cancellations)
+            if amount == 0:
+                 amount = float(body.get('amount', 0)) # Fallback generic amount
+            
             before_balance = float(user.get("balance", 0))
             new_balance = await user_repo.update_balance(str(user["_id"]), amount)
-            tx_id = f"rb_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            
+            tx_id = body.get('transactionId') or f"rb_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
             
             return {
                 "result": True,
