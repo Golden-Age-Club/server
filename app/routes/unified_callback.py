@@ -56,9 +56,6 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
         if not user:
             return {"result": False, "err_desc": "Player Not Found", "err_code": 2}
 
-        print(f"User from DB: {user}")
-        print(cmd)
-        
         # 2. HANDLE COMMANDS
         if cmd == 'getPlayerInfo' or cmd == 'getBalance':
             return {
