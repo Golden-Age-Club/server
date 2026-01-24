@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhook"])
 
 @router.post("/api/webhook/ccpayment")
-@router.post("/api/callback")
 async def ccpayment_webhook(
     request: Request,
     transaction_repo: TransactionRepository = Depends(get_transaction_repo),
