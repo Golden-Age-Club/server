@@ -276,56 +276,56 @@ class UnifiedCallbackRequest(BaseModel):
 
 @router.post("/api/callback")
 async def unified_callbackw(request: Request, user_repo: UserRepository = Depends(get_user_repo)):
-    print("The calback is working.")
-    # try:
-    #     body = await request.json()
-    #     cmd = body.get('cmd')
-    #     player_token = body.get('player_token')
+    try:
+        body = await request.json()
+        cmd = body.get('cmd')
+        player_token = body.get('player_token')
         
-    #     logger.info(f"🔔 MGC Webhook: {cmd} for token: {player_token[:20]}...")
+        print(f"🔔 MGC Webhook: {cmd} for token: {player_token[:20]}...")
 
-    #     # 1. FLEXIBLE TOKEN DECODING
-    #     user_id = None
-    #     try:
-    #         # Try your JWT logic first
-    #         payload = verify_access_token(player_token)
-    #         user_id = payload.get("sub")
-    #     except Exception:
-    #         # If JWT fails, try Base64 (like the MGC sample)
-    #         try:
-    #             decoded = base64.b64decode(player_token).decode('utf-8')
-    #             user_id = json.loads(decoded).get('player_id')
-    #         except:
-    #             logger.error("Could not decode player_token via JWT or Base64")
+        # 1. FLEXIBLE TOKEN DECODING
+        user_id = None
+        try:
+            # Try your JWT logic first
+            payload = verify_access_token(player_token)
+            print(f"JWT Payload: {payload}")
+            user_id = payload.get("sub")
+        except Exception:
+            # If JWT fails, try Base64 (like the MGC sample)
+            try:
+                decoded = base64.b64decode(player_token).decode('utf-8')
+                user_id = json.loads(decoded).get('player_id')
+            except:
+                logger.error("Could not decode player_token via JWT or Base64")
 
-    #     if not user_id:
-    #         return {"result": False, "err_desc": "Player Not Found", "err_code": 2}
+        if not user_id:
+            return {"result": False, "err_desc": "Player Not Found", "err_code": 2}
 
-    #     user = await user_repo.get_by_id(user_id)
+        user = await user_repo.get_by_id(user_id)
 
-    #     # 2. HANDLE COMMANDS
-    #     if cmd == 'getPlayerInfo' or cmd == 'getBalance':
-    #         return {
-    #             "result": True,
-    #             "err_desc": "OK",
-    #             "err_code": 0,
-    #             "currency": "USD",
-    #             "balance": float(user.get("balance", 0)),
-    #             "display_name": user.get("username", "Player"),
-    #             "player_id": str(user["_id"])
-    #         }
+        # 2. HANDLE COMMANDS
+        if cmd == 'getPlayerInfo' or cmd == 'getBalance':
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "currency": "USD",
+                "balance": float(user.get("balance", 0)),
+                "display_name": user.get("username", "Player"),
+                "player_id": str(user["_id"])
+            }
 
-    #     # 3. ACKNOWLEDGE BETS/WITHDRAWALS (Crucial for MGC)
-    #     elif cmd in ['withdraw', 'bet', 'win', 'refund']:
-    #         # For now, just acknowledge so the game doesn't crash
-    #         # You will need to implement actual balance updates here later!
-    #         return {
-    #             "result": True,
-    #             "err_desc": "OK",
-    #             "err_code": 0,
-    #             "balance": float(user.get("balance", 0))
-    #         }
+        # 3. ACKNOWLEDGE BETS/WITHDRAWALS (Crucial for MGC)
+        elif cmd in ['withdraw', 'bet', 'win', 'refund']:
+            # For now, just acknowledge so the game doesn't crash
+            # You will need to implement actual balance updates here later!
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "balance": float(user.get("balance", 0))
+            }
 
-    # except Exception as e:
-    #     logger.error(f"❌ Callback Crash: {e}")
-    #     return {"result": False, "err_desc": "Internal Error", "err_code": 500}
+    except Exception as e:
+        logger.error(f"❌ Callback Crash: {e}")
+        return {"result": False, "err_desc": "Internal Error", "err_code": 500}
