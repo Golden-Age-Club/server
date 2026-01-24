@@ -289,7 +289,8 @@ async def unified_callbackw(request: Request, user_repo: UserRepository = Depend
             # Try your JWT logic first
             payload = verify_access_token(player_token)
             print(f"JWT Payload: {payload}")
-            user_id = payload.get("sub")
+            # Support both 'user_id' (from user input) and 'sub' (standard JWT)
+            user_id = payload.get("user_id") or payload.get("sub")
             print(f"JWT user_id: {user_id}")
         except Exception:
             # If JWT fails, try Base64 (like the MGC sample)
