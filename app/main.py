@@ -45,7 +45,14 @@ app.add_middleware(RequestIDMiddleware)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-allowed_origins = settings.ALLOWED_ORIGINS.split(",")
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "https://pghome.co"
+]
+if settings.ALLOWED_ORIGINS:
+    allowed_origins.extend(settings.ALLOWED_ORIGINS.split(","))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -127,9 +134,11 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    port = int(os.environ.get("PORT", settings.API_PORT))
     uvicorn.run(
         "app.main:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
+        host="0.0.0.0",
+        port=port,
         reload=True
     )
