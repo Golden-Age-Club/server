@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 # ... (omitted)
 
-
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
