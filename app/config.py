@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from functools import lru_cache
@@ -20,7 +21,7 @@ class Settings(BaseSettings):
     
     # Application
     API_HOST: str = Field(default="0.0.0.0")
-    API_PORT: int = Field(default=8000)
+    API_PORT: int = int(os.environ.get("PORT", 8000))
     WEBHOOK_URL: str = Field(default="http://localhost:8000/api/webhook/ccpayment")
     
     # Testing

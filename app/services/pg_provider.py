@@ -58,8 +58,8 @@ class PGProviderClient:
 
         # Provider's steps: collect values (exclude sign/urls), comma-separate, URL-encode, HMAC-MD5
         values = [serialize(params[key]) for key in params if key not in ('sign', 'urls')]
-        comma_separated = ','.join(values)
-        encoded = urllib.parse.quote(comma_separated, safe='')
+        concatenated = "".join(values) # Updated to empty string join based on Node.js sample
+        encoded = urllib.parse.quote(concatenated, safe='')
         return hmac.new(self.api_key.encode('utf-8'), encoded.encode('utf-8'), hashlib.md5).hexdigest()
 
     async def get_options(self) -> Dict[str, Any]:

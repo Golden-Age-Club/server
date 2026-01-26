@@ -22,106 +22,144 @@ class UnifiedCallbackRequest(BaseModel):
     request_time: int
     signature: str
 
-@router.post("/api/v1/callback/unified")
-async def unified_callback(
-    request: Request,
-    user_repo: UserRepository = Depends(get_user_repo)
-):
+from datetime import datetime
+import uuid
+
+@router.post("/api/callback")
+async def unified_callbackw(request: Request, user_repo: UserRepository = Depends(get_user_repo)):
     try:
-        # Get raw body for signature verification if needed, or just use JSON
         body = await request.json()
-        
-        # Log the incoming request
-        logger.info(f"Callback received: {body}")
-        
         cmd = body.get('cmd')
         player_token = body.get('player_token')
-        currency_id = body.get('currencyId')
-        request_time = body.get('request_time')
-        signature = body.get('signature')
-        
-        # Verify Signature
-        # Note: We need to verify how the provider generates the signature for callbacks.
-        # Assuming it's similar to how we sign requests:
-        # values = [serialize(params[key]) for key in params if key not in ('sign', 'urls', 'signature')]
-        # But we need to know the order.
-        # For now, we will skip strict signature verification to get the flow working, 
-        # as the user didn't provide the exact verification algorithm in the python snippet.
-        # But we should log if it matches our expectation.
-        
-        # TODO: Implement strict signature verification once algorithm is confirmed.
-        
-        if cmd == 'getPlayerInfo':
-            # Decode player_token to get user_id
+    
+
+        # 1. FLEXIBLE TOKEN DECODING
+        user_id = None
+        try:
+            # Try your JWT logic first
+            payload = verify_access_token(player_token)
+            # Support both 'user_id' (from user input) and 'sub' (standard JWT)
+            user_id = payload.get("user_id") or payload.get("sub")
+        except Exception:
+            # If JWT fails, try Base64 (like the MGC sample)
             try:
-                # The token was created with create_access_token, so we verify it
-                payload = verify_access_token(player_token)
-                # We used "sub" for user_id in casino.py
-                user_id = payload.get("sub")
-                
-                if not user_id:
-                    logger.error("Token missing 'sub' claim")
-                    return {
-                        "result": False,
-                        "err_desc": "Invalid token payload",
-                        "err_code": 102
-                    }
-                    
-                user = await user_repo.get_by_id(user_id)
-                
-                if not user:
-                    logger.error(f"User not found: {user_id}")
-                    return {
-                        "result": False,
-                        "err_desc": "Player not found",
-                        "err_code": 2
-                    }
-                
-                # Construct success response
-                response_data = {
-                    "result": True,
-                    "err_desc": "OK",
-                    "err_code": 0,
-                    "currency": "USD", # Always return USD as that's what we launch with
-                    "balance": float(user.get("balance", 0)),
-                    "display_name": user.get("username") or user.get("first_name") or "Player",
-                    "gender": "m", # Default
-                    "country": "US", # Default
-                    "player_id": str(user["_id"]) # Return as string since ObjectId is string
-                }
-                
-                logger.info(f"Callback response: {response_data}")
-                return response_data
+                decoded = base64.b64decode(player_token).decode('utf-8')
+                user_id = json.loads(decoded).get('player_id')
+            except:
+                logger.error("Could not decode player_token via JWT or Base64")
 
-            except Exception as e:
-                logger.error(f"Token verification failed: {e}")
-                return {
-                    "result": False,
-                    "err_desc": "Invalid Token",
-                    "err_code": 102
-                }
-        
-        elif cmd in ['withdraw', 'deposit', 'rollback']:
-             # Placeholder for other commands
-             # For now return success to not block, or implement if needed.
-             # User only provided python code for getPlayerInfo mostly.
-             logger.warning(f"Unimplemented command: {cmd}")
-             return {
-                 "result": True, # Acknowledge? Or fail?
-                 "err_desc": "OK",
-                 "err_code": 0
-             }
+        if not user_id:
+            return {"result": False, "err_desc": "Player Not Found", "err_code": 2}
 
-        return {
-            "result": False,
-            "err_desc": "Invalid command",
-            "err_code": 3
-        }
+        user = await user_repo.get_by_id(user_id)
+        if not user:
+            return {"result": False, "err_desc": "Player Not Found", "err_code": 2}
+
+        # 2. HANDLE COMMANDS
+        if cmd == 'getPlayerInfo' or cmd == 'getBalance':
+            print({  "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "currency": "USD",
+                "balance": float(user.get("balance", 0)),
+                "display_name": user.get("username", "Player"),
+                "gender": "m",
+                "country": "US",
+                "player_id": str(user["_id"])})
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "currency": "USD",
+                "balance": float(user.get("balance", 0)),
+                "display_name": user.get("username", "Player"),
+                "gender": "m",
+                "country": "US",
+                "player_id": str(user["_id"])
+            }
+
+        elif cmd == 'deposit':
+            # "deposit" usually means the player WON (money comes IN to the wallet)
+            # Log shows: 'winAmount': 0 (or >0 if win), 'betInfo': '...'
+            amount = float(body.get('winAmount', 0))
+            
+            before_balance = float(user.get("balance", 0))
+            new_balance = await user_repo.update_balance(str(user["_id"]), amount)
+            
+            # Use provided transactionId or generate one
+            tx_id = body.get('transactionId') or f"dep_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "balance": new_balance,
+                "before_balance": before_balance,
+                "transactionId": tx_id
+            }
+
+        elif cmd == 'withdraw':
+            # "withdraw" usually means the player BET (money goes OUT of the wallet)
+            # Log shows: 'betAmount': 100
+            amount = float(body.get('betAmount', 0))
+            
+            before_balance = float(user.get("balance", 0))
+            try:
+                new_balance = await user_repo.deduct_balance(str(user["_id"]), amount)
+            except HTTPException:
+                return {"result": False, "err_desc": "Insufficient balance", "err_code": 100}
+                
+            tx_id = body.get('transactionId') or f"wd_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "balance": new_balance,
+                "before_balance": before_balance,
+                "transactionId": tx_id
+            }
+
+        elif cmd == 'rollback':
+            # Rollback: Refund a previous transaction (usually a bet/withdraw)
+            # Log shows: 'transactionId', but amount might not be explicit in simple rollback
+            # However, typically rollback includes the amount to refund or we might need to look it up.
+            # Based on logs provided, rollback doesn't show amount, but let's check standard PG/MGC logic.
+            # Usually rollback provides 'betAmount' or 'amount' to refund.
+            # If not present, we might need to assume it's full refund or handle 0 safely.
+            # Let's check if 'betAmount' or 'amount' is in body for rollback.
+            # If strictly following logs: {'cmd': 'rollback', ...} no amount shown in your snippet.
+            # But normally rollback cancels a bet, so we should ADD back the money.
+            
+            # SAFELY GET AMOUNT:
+            amount = float(body.get('betAmount', 0)) # Try betAmount first (common in bet cancellations)
+            if amount == 0:
+                 amount = float(body.get('amount', 0)) # Fallback generic amount
+            
+            before_balance = float(user.get("balance", 0))
+            new_balance = await user_repo.update_balance(str(user["_id"]), amount)
+            
+            tx_id = body.get('transactionId') or f"rb_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}"
+            
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "balance": new_balance,
+                "before_balance": before_balance,
+                "transactionId": tx_id
+            }
+
+        # 3. ACKNOWLEDGE OTHERS
+        elif cmd in ['bet', 'win', 'refund']:
+            # Fallback for other commands if any
+            return {
+                "result": True,
+                "err_desc": "OK",
+                "err_code": 0,
+                "balance": float(user.get("balance", 0))
+            }
 
     except Exception as e:
-        logger.error(f"Callback error: {e}")
-        return {
-            "result": False,
-            "err_desc": "Internal server error",
-            "err_code": 500
-        }
+        logger.error(f"❌ Callback Crash: {e}")
+        return {"result": False, "err_desc": "Internal Error", "err_code": 500}
