@@ -24,7 +24,7 @@ CACHE_DURATION = 600
 class CasinoGameProvider(Protocol):
     async def get_options(self) -> Dict[str, Any]:
         ...
-    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         ...
     async def launch_game(
         self,
@@ -143,7 +143,7 @@ class PGProviderClient:
                 detail=f"PG API error: {exc.response.text}",
             ) from exc
             
-    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         global _games_cache
         
         if not self.app_id or not self.api_key:
@@ -191,8 +191,23 @@ class PGProviderClient:
                     detail=f"PG API error: {exc.response.text}",
                 ) from exc
 
-        # Pagination logic
+        # Filter logic
         all_games = _games_cache["data"]
+        
+        if provider_id and provider_id != 'all':
+            all_games = [
+                g for g in all_games 
+                if (g.get('provider_title') == provider_id or g.get('uniq_provider') == provider_id)
+            ]
+            
+        if search:
+            search_lower = search.lower()
+            all_games = [
+                g for g in all_games 
+                if search_lower in g.get('name', '').lower()
+            ]
+
+        # Pagination logic
         total_games = len(all_games)
         start_idx = (page - 1) * limit
         end_idx = start_idx + limit

@@ -72,10 +72,12 @@ async def get_pg_options(provider: CasinoGameProvider = Depends(get_pg_provider)
 async def get_pg_games(
     provider: CasinoGameProvider = Depends(get_pg_provider),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page")
+    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    provider_id: Optional[str] = Query(None, description="Filter by provider"),
+    search: Optional[str] = Query(None, description="Search term")
 ):
     try:
-        data = await provider.get_games(page=page, limit=limit)
+        data = await provider.get_games(page=page, limit=limit, provider_id=provider_id, search=search)
         return data
     except HTTPException:
         raise
