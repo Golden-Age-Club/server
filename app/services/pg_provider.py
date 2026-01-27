@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import urllib.parse
 import json
+import random
 from typing import Dict, Any, Protocol, Optional
 
 import httpx
@@ -181,6 +182,9 @@ class PGProviderClient:
                 elif isinstance(data, dict) and "games" in data:
                     games_list = data["games"]
                 
+                # Shuffle games to mix providers
+                random.shuffle(games_list)
+
                 # Update cache
                 _games_cache["data"] = games_list
                 _games_cache["timestamp"] = current_time
