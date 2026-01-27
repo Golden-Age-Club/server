@@ -14,10 +14,17 @@ from app.config import get_settings
 settings = get_settings()
 
 
+_games_cache = {
+    "data": [],
+    "timestamp": 0.0,
+}
+CACHE_DURATION = 600
+
+
 class CasinoGameProvider(Protocol):
     async def get_options(self) -> Dict[str, Any]:
         ...
-    async def get_games(self) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
         ...
     async def launch_game(
         self,
@@ -136,36 +143,69 @@ class PGProviderClient:
                 detail=f"PG API error: {exc.response.text}",
             ) from exc
             
-    async def get_games(self) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
+        global _games_cache
+        
         if not self.app_id or not self.api_key:
             raise HTTPException(status_code=500, detail="PG provider not configured")
 
-        request_time = str(int(time.time() * 1000))
-        sign = self._create_sign(request_time)
+        current_time = time.time()
+        
+        # Check cache validity
+        if not _games_cache["data"] or (current_time - _games_cache["timestamp"] > CACHE_DURATION):
+            request_time = str(int(current_time * 1000))
+            sign = self._create_sign(request_time)
 
-        params = {
-            "app_id": self.app_id,
-            "request_time": request_time,
-            "sign": sign,
+            params = {
+                "app_id": self.app_id,
+                "request_time": request_time,
+                "sign": sign,
+            }
+
+            url = f"{self.base_url}/api/v1/get-games"
+
+            response = await self.client.get(
+                url,
+                params=params,
+                headers={"Accept": "application/json"},
+            )
+
+            try:
+                response.raise_for_status()
+                data = response.json()
+                
+                # Normalize data structure
+                games_list = []
+                if isinstance(data, list):
+                    games_list = data
+                elif isinstance(data, dict) and "games" in data:
+                    games_list = data["games"]
+                
+                # Update cache
+                _games_cache["data"] = games_list
+                _games_cache["timestamp"] = current_time
+                
+            except httpx.HTTPStatusError as exc:
+                raise HTTPException(
+                    status_code=exc.response.status_code,
+                    detail=f"PG API error: {exc.response.text}",
+                ) from exc
+
+        # Pagination logic
+        all_games = _games_cache["data"]
+        total_games = len(all_games)
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        
+        paginated_games = all_games[start_idx:end_idx]
+        
+        return {
+            "games": paginated_games,
+            "total": total_games,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_games + limit - 1) // limit
         }
-
-        url = f"{self.base_url}/api/v1/get-games"
-
-        response = await self.client.get(
-            url,
-            params=params,
-            headers={"Accept": "application/json"},
-        )
-
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise HTTPException(
-                status_code=exc.response.status_code,
-                detail=f"PG API error: {exc.response.text}",
-            ) from exc
-
-        return response.json()
 
     async def launch_game(
         self,
@@ -249,25 +289,34 @@ class MockPGProvider:
             "categories": [],
         }
 
-    async def get_games(self) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
+        games = [
+            {
+                "categories": ["51"],
+                "id": 4601,
+                "lower_key": "supertwister",
+                "game_type": 1,
+                "uniq_provider": "habanero",
+                "provider_title": "Habanero",
+                "name": "Super Twister",
+                "image": "https://mimgs.cdnparts.com/ts2/habanero/supertwister.jpg",
+                "provider_code": "HABANERO",
+                "provider_id": 1152,
+                "is_active": 1,
+                "background": "https://www.cmsbetconstruct.com/content/images/casino/background/ffe5ca058c9ca633f31a6627a34c5293_background.jpeg",
+                "sorder": 1000,
+            }
+        ]
+        total = len(games)
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_games = games[start_idx:end_idx]
         return {
-            "games": [
-                {
-                    "categories": ["51"],
-                    "id": 4601,
-                    "lower_key": "supertwister",
-                    "game_type": 1,
-                    "uniq_provider": "habanero",
-                    "provider_title": "Habanero",
-                    "name": "Super Twister",
-                    "image": "https://mimgs.cdnparts.com/ts2/habanero/supertwister.jpg",
-                    "provider_code": "HABANERO",
-                    "provider_id": 1152,
-                    "is_active": 1,
-                    "background": "https://www.cmsbetconstruct.com/content/images/casino/background/ffe5ca058c9ca633f31a6627a34c5293_background.jpeg",
-                    "sorder": 1000,
-                }
-            ]
+            "games": paginated_games,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total + limit - 1) // limit,
         }
 
     async def launch_game(

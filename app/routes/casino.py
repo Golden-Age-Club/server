@@ -3,7 +3,7 @@ import uuid
 from datetime import timedelta
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from pydantic import BaseModel
 
 from app.services.pg_provider import CasinoGameProvider, get_pg_provider
@@ -69,9 +69,13 @@ async def get_pg_options(provider: CasinoGameProvider = Depends(get_pg_provider)
 
 
 @router.get("/pg/games")
-async def get_pg_games(provider: CasinoGameProvider = Depends(get_pg_provider)):
+async def get_pg_games(
+    provider: CasinoGameProvider = Depends(get_pg_provider),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page")
+):
     try:
-        data = await provider.get_games()
+        data = await provider.get_games(page=page, limit=limit)
         return data
     except HTTPException:
         raise
