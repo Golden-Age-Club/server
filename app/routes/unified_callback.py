@@ -29,6 +29,7 @@ import uuid
 async def unified_callbackw(request: Request, user_repo: UserRepository = Depends(get_user_repo)):
     try:
         body = await request.json()
+        print(body)
         cmd = body.get('cmd')
         player_token = body.get('player_token')
     
