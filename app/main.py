@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
+from app.core.socket import sio
+import socketio
+
 app = FastAPI(
     title="Golden Age USDT Wallet API",
     description="USDT Wallet Integration with CCPayment and Telegram Authentication",
@@ -40,6 +43,7 @@ app = FastAPI(
         "name": "Proprietary",
     },
 )
+
 
 app.add_middleware(RequestIDMiddleware)
 
@@ -126,6 +130,10 @@ async def health_check():
         health_status["checks"]["payment_provider"] = "configured"
     
     return health_status
+
+# Mount Socket.IO at the end
+# We wrap the FastAPI app with Socket.IO's ASGIApp
+app = socketio.ASGIApp(sio, app)
 
 if __name__ == "__main__":
     import uvicorn

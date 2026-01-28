@@ -13,6 +13,7 @@ from app.dependencies import get_user_repo, get_transaction_repo
 from app.middleware.auth import verify_access_token
 from app.models.transaction import TransactionType, TransactionStatus
 import base64
+from app.core.socket import sio
 
 router = APIRouter(tags=["callback"])
 settings = get_settings()
@@ -158,6 +159,16 @@ async def unified_callback(
 
             # Update User Stats
             await user_repo.update_game_stats(str(user["_id"]), bet_amount=amount)
+            
+            # Emit Socket Event
+            await sio.emit('new_bet', {
+                "user_id": str(user["_id"]),
+                "username": user.get("username", "Player"),
+                "amount": amount,
+                "currency": body.get('currencyId', 'USD'),
+                "game_id": body.get('gameId'),
+                "timestamp": datetime.utcnow().isoformat()
+            })
             
             return {
                 "result": True,
