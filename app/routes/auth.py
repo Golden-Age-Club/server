@@ -164,3 +164,13 @@ async def refresh_token(
         token_type="bearer",
         user=current_user
     )
+
+
+@router.get("/check-username")
+async def check_username(
+    username: str,
+    user_repo: UserRepository = Depends(get_user_repo)
+):
+    """Check if a username is available"""
+    existing_user = await user_repo.get_by_username(username)
+    return {"available": existing_user is None}
