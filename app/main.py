@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
-from app.routes import wallet, webhook, auth, support, casino, unified_callback, user
+from app.routes import wallet, webhook, auth, support, casino, unified_callback, user, transactions
 from app.config import get_settings
 import logging
 
@@ -27,9 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 limiter = Limiter(key_func=get_remote_address)
-
-from app.core.socket import sio
-import socketio
 
 app = FastAPI(
     title="Golden Age USDT Wallet API",
@@ -84,6 +81,7 @@ app.include_router(casino.router)
 app.include_router(unified_callback.router)
 app.include_router(support.router)
 app.include_router(user.router)
+app.include_router(transactions.router)
 
 @app.get("/")
 async def root():
@@ -130,10 +128,6 @@ async def health_check():
         health_status["checks"]["payment_provider"] = "configured"
     
     return health_status
-
-# Mount Socket.IO at the end
-# We wrap the FastAPI app with Socket.IO's ASGIApp
-app = socketio.ASGIApp(sio, app)
 
 if __name__ == "__main__":
     import uvicorn

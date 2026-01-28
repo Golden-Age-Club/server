@@ -69,3 +69,12 @@ class TransactionRepository:
             t["_id"] = str(t["_id"])
         
         return transactions
+
+    async def get_recent_transactions(self, limit: int = 50) -> List[Dict]:
+        cursor = self.collection.find().sort("created_at", -1).limit(limit)
+        transactions = await cursor.to_list(length=limit)
+        
+        for t in transactions:
+            t["_id"] = str(t["_id"])
+        
+        return transactions
