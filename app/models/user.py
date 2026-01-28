@@ -15,6 +15,9 @@ class User(BaseModel):
     balance: float = Field(default=0.0)
     is_active: bool = Field(default=True)
     is_premium: bool = Field(default=False)
+    total_bet: float = Field(default=0.0)
+    total_won: float = Field(default=0.0)
+    best_win: float = Field(default=0.0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

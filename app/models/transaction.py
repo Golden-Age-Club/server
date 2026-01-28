@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 class TransactionType(str, Enum):
     DEPOSIT = "deposit"
     WITHDRAWAL = "withdrawal"
+    GAME_BET = "game_bet"
+    GAME_WIN = "game_win"
+    GAME_REFUND = "game_refund"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"

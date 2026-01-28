@@ -98,11 +98,17 @@ class UserRepository:
         return user.get("balance", 0.0)
     
     async def get_balance_or_default(self, user_id: str) -> float:
-        """Get user's balance or return 0.0 if user doesn't exist."""
+        """Get user's current balance or default to 0.0 if not found"""
         try:
             return await self.get_balance(user_id)
         except HTTPException:
             return 0.0
+
+    async def get_top_users(self, limit: int = 100) -> list:
+        """Get top users sorted by total_won descending"""
+        cursor = self.collection.find().sort("total_won", -1).limit(limit)
+        users = await cursor.to_list(length=limit)
+        return users
     
     async def update_balance(self, user_id: str, amount: float) -> float:
         """Atomically update balance."""
@@ -171,3 +177,31 @@ class UserRepository:
     async def get_user(self, user_id: str) -> Optional[dict]:
         """Get user by user_id"""
         return await self.get_by_id(user_id)
+
+    async def update_game_stats(self, user_id: str, bet_amount: float = 0, win_amount: float = 0) -> None:
+        """Atomically update user game statistics."""
+        from bson import ObjectId
+        query = {}
+        try:
+            query = {"_id": ObjectId(user_id)}
+        except:
+            if user_id.isdigit():
+                query = {"telegram_id": int(user_id)}
+            else:
+                return # Fail silently if ID invalid
+
+        update_ops = {
+            "$inc": {
+                "total_bet": bet_amount,
+                "total_won": win_amount
+            },
+            "$set": {
+                "updated_at": datetime.utcnow()
+            }
+        }
+        
+        # Only update best_win if the current win is greater
+        if win_amount > 0:
+            update_ops["$max"] = {"best_win": win_amount}
+
+        await self.collection.update_one(query, update_ops)

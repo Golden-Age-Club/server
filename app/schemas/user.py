@@ -27,6 +27,9 @@ class UserResponse(BaseModel):
     balance: float
     is_active: bool
     is_premium: bool
+    total_bet: float = 0.0
+    total_won: float = 0.0
+    best_win: float = 0.0
     created_at: datetime
     updated_at: datetime
     
