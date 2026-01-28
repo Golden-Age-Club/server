@@ -90,36 +90,20 @@
 </div>
 
 <script>
-    const wsUrl = "{{ ws_url }}";
+    // WebSocket removed as per request
+    // const wsUrl = "{{ ws_url }}";
     const chatBox = document.getElementById('chat-box');
     const input = document.getElementById('message-input');
 
     // Auto scroll to bottom
     chatBox.scrollTop = chatBox.scrollHeight;
 
-    console.log("Connecting to WS:", wsUrl);
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = function () {
-        console.log("Connected to Chat WS");
-    };
-
-    ws.onmessage = function (event) {
-        const data = JSON.parse(event.data);
-        console.log("New message:", data);
-        appendMessage(data);
-    };
-
-    ws.onclose = function () {
-        console.log("WS Closed");
-        alert("Connection lost. Refresh page.");
-    };
-
     function sendMessage() {
+        // Fallback to HTTP or disabled
+        alert("Real-time chat is disabled. Please refresh to see new messages.");
         const content = input.value.trim();
         if (!content) return;
-
-        ws.send(JSON.stringify({ content: content }));
+        // submit via form or ajax (not implemented here yet)
         input.value = "";
     }
 

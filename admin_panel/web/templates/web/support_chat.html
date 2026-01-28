@@ -216,101 +216,12 @@
 
 <script>
     const ticketId = "{{ ticket_id }}";
-    // Using admin bypass token for WebSocket
-    // Use wss if https, ws if http. 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = `${protocol}://${window.location.hostname}:8000/api/support/ws/${ticketId}?token={{ admin_ws_token }}`;
-
-    let socket;
+    // WebSocket removed as per request
+    
     const messagesDiv = document.getElementById('chat-messages');
     const input = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const emptyState = document.getElementById('empty-state');
-
-    // Store sent messages temporarily to avoid duplication if the server echoes them back
-    // Or simpler: Just check if the last message is identical. 
-    // Given the simple nature, we'll just ignore echo for now if it matches our optimistic push, 
-    // but typically standard Websockets echo back. 
-    // Let's implement robust Optimistic UI.
-
-    // Current User ID (Admin) - In a real app we'd have this ID. 
-    // For now, we assume "admin" role for self.
-
-    function connect() {
-        console.log("Connecting to WS:", wsUrl);
-        socket = new WebSocket(wsUrl);
-
-        socket.onopen = function (e) {
-            console.log("Connected to chat");
-            scrollToBottom();
-        };
-
-        socket.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-            console.log("Received:", data);
-
-            // Check if we should append this message
-            // If we just sent it optimistically, we might want to skip or update it.
-            // For simplicity in this MVP: 
-            // If the message is from 'admin', we assummed we already displayed it via optimistic UI.
-            // HOWEVER, if there are multiple admins, we should show it.
-            // Safest bet for single-user feel: 
-            // If I am strictly the only one sending as 'admin' in this session, I can ignore 'admin' messages from WS.
-            // But if I refresh, I need them. 
-            // Better approach: Do NOT ignore. Just append. 
-            // But the user complained "you don't see it drop". 
-            // So we MUST use Optimistic UI, and then we have to handle the duplicate.
-
-            // Deduplication Strategy:
-            // Check if the last message in DOM has the same content and role.
-            const lastMsg = messagesDiv.lastElementChild;
-            if (lastMsg) {
-                const lastContent = lastMsg.querySelector('.message-bubble')?.innerText.trim();
-                const lastRole = lastMsg.classList.contains('admin') ? 'admin' : 'user';
-
-                // If it matches exactly what we just received, assume it's the echo and skip
-                if (data.sender_role === lastRole && data.content.trim() === lastContent) {
-                    console.log("Duplicate/Echo detected, skipping append.");
-                    return;
-                }
-            }
-
-            appendMessage(data);
-            scrollToBottom();
-        };
-
-        socket.onclose = function (event) {
-            console.log('Connection closed');
-            // Optional: Reconnect logic could go here
-        };
-
-        socket.onerror = function (error) {
-            console.error(`[error]`, error);
-        };
-    }
-
-    function appendMessage(msg, isOptimistic = false) {
-        if (emptyState) emptyState.style.display = 'none';
-
-        const div = document.createElement('div');
-        const role = msg.sender_role === 'admin' ? 'admin' : 'user';
-        div.className = `message-wrapper ${role}`;
-
-        // Time formatting
-        const date = new Date(msg.created_at || Date.now());
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        div.innerHTML = `
-            <div class="message-bubble">
-                ${msg.content}
-            </div>
-            <div class="message-meta">
-                ${msg.sender_role === 'admin' ? 'Agent' : 'User'} • ${timeStr}
-            </div>
-        `;
-        messagesDiv.appendChild(div);
-        scrollToBottom();
-    }
 
     function scrollToBottom() {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -318,25 +229,8 @@
 
     function sendMessage() {
         if (!input.value.trim()) return;
-        const content = input.value;
-
-        // 1. Optimistic UI: Show immediately
-        appendMessage({
-            sender_role: 'admin',
-            content: content,
-            created_at: new Date().toISOString()
-        }, true);
-
-        // 2. Send to Server
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ content: content }));
-        } else {
-            console.error("Socket not open");
-            alert("Connection lost. Please refresh.");
-        }
-
+        alert("Real-time chat is disabled. Please refresh to see new messages.");
         input.value = '';
-        input.focus();
     }
 
     if (sendBtn) {
@@ -345,9 +239,8 @@
             if (e.key === 'Enter') sendMessage();
         };
     }
-
-    // Start
-    connect();
-
+    
+    // Auto scroll on load
+    scrollToBottom();
 </script>
 {% endblock %}
