@@ -36,7 +36,7 @@ async def unified_callback(
 ):
     try:
         body = await request.json()
-        print(f"Callback Body: {body}")
+        logger.info(f"Callback Received: {body}") # Use logger for visibility
         cmd = body.get('cmd')
         player_token = body.get('player_token')
     
@@ -75,11 +75,13 @@ async def unified_callback(
         # 2. HANDLE COMMANDS
         if cmd == 'getPlayerInfo' or cmd == 'getBalance':
             logger.info(f"Returning Player Info for {user_id}")
+            currency = body.get('currencyId') or user.get('currency', 'USD')
             return {
                 "result": True,
                 "err_desc": "OK",
                 "err_code": 0,
-                "currency": "USD",
+                "error_code": 0, # Compatibility alias
+                "currency": currency,
                 "balance": float(user.get("balance", 0)),
                 "display_name": user.get("username", "Player"),
                 "gender": "m",
@@ -88,6 +90,7 @@ async def unified_callback(
             }
 
         elif cmd == 'deposit':
+            logger.info(f"Processing Deposit for {user_id}")
             # "deposit" usually means the player WON (money comes IN to the wallet)
             amount = float(body.get('winAmount', 0))
             if amount < 0:
@@ -125,6 +128,7 @@ async def unified_callback(
             }
 
         elif cmd == 'withdraw':
+            logger.info(f"Processing Withdraw for {user_id}")
             # "withdraw" usually means the player BET (money goes OUT of the wallet)
             amount = float(body.get('betAmount', 0))
             # Safety: ensure amount is non-negative
@@ -169,6 +173,7 @@ async def unified_callback(
             }
 
         elif cmd == 'rollback':
+            logger.info(f"Processing Rollback for {user_id}")
             # Rollback: Refund a previous transaction (usually a bet/withdraw)
             # Log shows: 'transactionId', but amount might not be explicit in simple rollback
             # However, typically rollback includes the amount to refund or we might need to look it up.
@@ -222,6 +227,7 @@ async def unified_callback(
             }
         
         else:
+             logger.warning(f"Unknown Command Received: {cmd}")
              return {"result": False, "err_desc": "Unknown Command", "err_code": 3}
 
     except Exception as e:
