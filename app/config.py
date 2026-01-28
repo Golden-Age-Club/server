@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     
     # CORS
     # In Prod, this should include the Admin Panel URL
-    ALLOWED_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8000,http://localhost:5173,https://pghome.co")
+    ALLOWED_ORIGINS: str = Field(default="http://localhost:5173,https://pghome.co")
     
     # Frontend
     FRONTEND_URL: str = Field(default="http://localhost:5173")
