@@ -116,6 +116,16 @@ async def unified_callback(
             # Update User Stats
             await user_repo.update_game_stats(str(user["_id"]), win_amount=amount)
             
+            # Emit Socket Event
+            await sio.emit('new_win', {
+                "user_id": str(user["_id"]),
+                "username": user.get("username", "Player"),
+                "amount": amount,
+                "currency": body.get('currencyId', 'USD'),
+                "game_id": body.get('gameId'),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
             return {
                 "result": True,
                 "err_desc": "OK",
