@@ -91,8 +91,8 @@ async def unified_callback(
             existing_tx = await transaction_repo.get_by_merchant_order_id(transaction_id)
             if existing_tx:
                 return {
-                    'result': False, # Success (Idempotent)
-                    'err_desc': 'Transaction already processed',
+                    'result': True, # Success (Idempotent)
+                    'err_desc': 'OK',
                     'err_code': 0,
                     'balance': float(user.get("balance", 0)),
                     'before_balance': float(user.get("balance", 0)), # Approx
@@ -105,7 +105,7 @@ async def unified_callback(
             # Insufficient Balance
             if new_balance < 0:
                 return {
-                    'result': True, # Error
+                    'result': True, # Error handled with code
                     'err_desc': 'Insufficient balance',
                     'err_code': 3,
                     'balance': before_balance,
@@ -130,7 +130,7 @@ async def unified_callback(
             )
 
             return {
-                'result': False, # Success
+                'result': True, # Success
                 'err_desc': 'OK',
                 'err_code': 0,
                 'balance': new_balance,
@@ -144,8 +144,8 @@ async def unified_callback(
             existing_tx = await transaction_repo.get_by_merchant_order_id(transaction_id)
             if existing_tx:
                 return {
-                    'result': False,
-                    'err_desc': 'Transaction already processed',
+                    'result': True,
+                    'err_desc': 'OK',
                     'err_code': 0,
                     'balance': float(user.get("balance", 0)),
                     'before_balance': float(user.get("balance", 0)),
@@ -172,7 +172,7 @@ async def unified_callback(
             )
 
             return {
-                'result': False,
+                'result': True,
                 'err_desc': 'OK',
                 'err_code': 0,
                 'balance': new_balance,
@@ -185,9 +185,6 @@ async def unified_callback(
             # 1. Check if the original transaction exists (the one to be rolled back)
             original_tx = await transaction_repo.get_by_merchant_order_id(transaction_id)
             if not original_tx:
-                 # Sample says: return Error 2 "Transaction not found"
-                 # BUT, if it's not found, maybe we should just ignore it?
-                 # Sample code returns 404.
                  return {
                     'result': True,
                     'err_desc': 'Transaction not found',
@@ -195,33 +192,15 @@ async def unified_callback(
                 }
             
             # 2. Check if ALREADY rolled back
-            # We need to find if there is a 'rollback' type transaction with THIS transactionId
-            # But wait, usually 'transactionId' in the request IS the ID of the transaction to rollback.
-            # And the rollback itself should have a NEW ID?
-            # Or does the provider send the SAME transactionId for the rollback command?
-            # The sample query: "SELECT transactionId FROM transactions WHERE transactionId = %s AND type = 'rollback'"
-            # This implies the provider sends the SAME transactionId for the rollback.
-            # AND the original transaction ALSO has that transactionId.
-            # So we have TWO transactions with the same 'merchant_order_id' (transactionId)?
-            # One is 'withdraw'/'deposit', the other is 'rollback'.
-            
-            # My repo `get_by_merchant_order_id` returns ONE.
-            # I need to check specifically for the rollback type.
-            
-            # Since my repo might not support complex filtering yet, I'll do a custom find in the route or expand repo.
-            # Let's expand repo logic slightly by using the collection directly if needed or assuming strict 1-to-1 mapping isn't enough.
-            # Actually, standard Mongo repo usage:
-            
-            # Check for existing ROLLBACK for this transaction ID
             existing_rollback = await transaction_repo.collection.find_one({
                 "merchant_order_id": transaction_id,
-                "type": TransactionType.GAME_REFUND # Using REFUND as Rollback
+                "type": TransactionType.GAME_REFUND 
             })
             
             if existing_rollback:
                 return {
-                    'result': False,
-                    'err_desc': 'Rollback already processed',
+                    'result': True,
+                    'err_desc': 'OK',
                     'err_code': 0,
                     'balance': float(user.get("balance", 0)),
                     'before_balance': float(user.get("balance", 0)),
@@ -235,12 +214,12 @@ async def unified_callback(
             before_balance = float(user.get("balance", 0))
             new_balance = before_balance
             
-            if transaction_type == TransactionType.GAME_BET: # withdraw in sample
+            if transaction_type == TransactionType.GAME_BET: 
                 # Reverse withdraw -> Add money back
                 new_balance = before_balance + transaction_amount
                 await user_repo.update_balance(user_id_str, transaction_amount)
                 
-            elif transaction_type == TransactionType.GAME_WIN: # deposit in sample
+            elif transaction_type == TransactionType.GAME_WIN: 
                 # Reverse deposit -> Deduct money
                 new_balance = before_balance - transaction_amount
                 if new_balance < 0:
@@ -268,14 +247,14 @@ async def unified_callback(
                 amount=transaction_amount,
                 currency=currency_id or "USD",
                 status=TransactionStatus.COMPLETED,
-                merchant_order_id=transaction_id, # Same ID as original, distinguished by type
+                merchant_order_id=transaction_id, 
                 game_id=game_id,
                 round_id=round_id,
                 bet_info=bet_info
             )
 
             return {
-                'result': False,
+                'result': True,
                 'err_desc': 'OK',
                 'err_code': 0,
                 'balance': new_balance,
@@ -291,12 +270,11 @@ async def unified_callback(
                 "err_desc": "OK",
                 "err_code": 0,
                 "currency": currency,
-                "currencyId": currency,
                 "balance": float(user.get("balance", 0)),
                 "display_name": user.get("username", "Player"),
-                "player_id": user_id_str,
-                "partnerPlayerId": user_id_str,
-                "vipLevel": 0
+                "gender": user.get("gender", "Male"),
+                "country": user.get("country", "TR"),
+                "player_id": user.get("telegram_id") or user_id_str
             }
 
         else:
