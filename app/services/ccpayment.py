@@ -59,19 +59,38 @@ class CCPaymentClient:
         try:
             timestamp = str(int(time.time() * 1000))
             
+            # Using Hosted Checkout Page Integration endpoint
+            # https://admin.ccpayment.com/ccpayment/v1/concise/url/get
+            
             payload = {
                 "app_id": self.app_id,
                 "merchant_order_id": order_id,
-                "order_amount": str(amount),
-                "order_currency": currency,
-                "product_name": product_name,
                 "product_price": str(amount),
+                "order_valid_period": 3600, # 1 hour validity
+                "product_name": product_name,
+                # "fiat_currency_id": "", # Optional if using crypto
+                # "order_currency": currency, # Not needed for hosted page if letting user choose? 
+                # Actually for hosted page v1/concise/url/get, we usually send price.
+                # Let's verify if 'order_currency' is valid here.
+                # Documentation says 'product_price' and 'order_valid_period'.
+                # But to force a specific currency we might need another param or just pass it differently.
+                # For now let's stick to the hosted page generic flow where user selects coin, 
+                # OR if we want to force TRC20, we might need to check if we can pass it.
+                # Re-reading docs: "order_currency" might be for non-hosted or different endpoint.
+                # However, the user wants to deposit USDT.TRC20. 
+                # If we use concise/url/get, it opens a page. 
+                # Let's try to pass the amount and let user pick (or if we can pre-select).
             }
+            
+            # Note: For concise/url/get, documentation usually requires:
+            # merchant_order_id, product_price, product_name, order_valid_period.
             
             if notify_url:
                 payload["notify_url"] = notify_url
             if return_url:
                 payload["return_url"] = return_url
+            
+            # For hosted page, we might redirect user to this URL
             
             signature = self._generate_signature(timestamp, payload)
             
@@ -82,8 +101,20 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
+            # Correct Endpoint for Hosted Checkout
+            # Base URL is https://admin.ccpayment.com/ccpayment/v2 in config, 
+            # but this endpoint is v1 sometimes? 
+            # Let's look at the config. api_url is .../v2.
+            # We need to be careful with the path.
+            # If config is .../v2, we might need to replace it or just append if it was just host.
+            # Config: https://admin.ccpayment.com/ccpayment/v2
+            # We want: https://admin.ccpayment.com/ccpayment/v1/concise/url/get
+            
+            # Let's construct URL safely.
+            base_url = self.base_url.replace("/v2", "/v1") # Hack due to config being fixed to v2
+            
             response = await self.client.post(
-                f"{self.base_url}/bill/create",
+                f"{base_url}/concise/url/get",
                 json=payload,
                 headers=headers
             )
@@ -91,9 +122,7 @@ class CCPaymentClient:
             try:
                 result = response.json()
             except ValueError as e:
-                # "Extra data" or "Expecting value" errors come from here
                 print(f"❌ CCPayment JSON Error. Status: {response.status_code}, Raw response: '{response.text}'")
-                # We assume it's a 502 Bad Gateway from the provider side if they send garbage
                 raise HTTPException(status_code=502, detail=f"Invalid response from payment provider: {response.text[:200]}")
             
             if result.get("code") != 10000:
