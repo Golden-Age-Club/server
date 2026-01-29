@@ -120,11 +120,12 @@ class CCPaymentClient:
             # Config: https://admin.ccpayment.com/ccpayment/v2
             # We want: https://admin.ccpayment.com/ccpayment/v1/concise/url/get
             
-            # Let's construct URL safely.
-            base_url = self.base_url.replace("/v2", "/v1") # Hack due to config being fixed to v2
+            # Correct Endpoint for Hosted Checkout (Trying v2)
+            # User reported "merchant account can only call api of version 2" when using v1.
+            # So we will try the v2 equivalent of the hosted checkout endpoint.
             
             response = await self.client.post(
-                f"{base_url}/concise/url/get",
+                f"{self.base_url}/concise/url/get",
                 json=payload,
                 headers=headers
             )
