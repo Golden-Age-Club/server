@@ -56,53 +56,59 @@ class CCPaymentClient:
         notify_url: str = None,
         return_url: str = None
     ) -> Dict[str, Any]:
-        timestamp = str(int(time.time() * 1000))
-        
-        payload = {
-            "app_id": self.app_id,
-            "merchant_order_id": order_id,
-            "order_amount": str(amount),
-            "order_currency": currency,
-            "product_name": product_name,
-            "product_price": str(amount),
-        }
-        
-        if notify_url:
-            payload["notify_url"] = notify_url
-        if return_url:
-            payload["return_url"] = return_url
-        
-        signature = self._generate_signature(timestamp, payload)
-        
-        headers = {
-            "Content-Type": "application/json",
-            "Appid": self.app_id,
-            "Timestamp": timestamp,
-            "Sign": signature
-        }
-        
-        response = await self.client.post(
-            f"{self.base_url}/bill/create",
-            json=payload,
-            headers=headers
-        )
-        
         try:
-            result = response.json()
-        except ValueError as e:
-            # "Extra data" or "Expecting value" errors come from here
-            print(f"❌ CCPayment JSON Error. Status: {response.status_code}, Raw response: '{response.text}'")
-            # We assume it's a 502 Bad Gateway from the provider side if they send garbage
-            raise HTTPException(status_code=502, detail=f"Invalid response from payment provider: {response.text[:200]}")
-        
-        if result.get("code") != 10000:
-            print(f"❌ CCPayment API Error: {result}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"CCPayment API error: {result.get('msg', 'Unknown error')}"
+            timestamp = str(int(time.time() * 1000))
+            
+            payload = {
+                "app_id": self.app_id,
+                "merchant_order_id": order_id,
+                "order_amount": str(amount),
+                "order_currency": currency,
+                "product_name": product_name,
+                "product_price": str(amount),
+            }
+            
+            if notify_url:
+                payload["notify_url"] = notify_url
+            if return_url:
+                payload["return_url"] = return_url
+            
+            signature = self._generate_signature(timestamp, payload)
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Appid": self.app_id,
+                "Timestamp": timestamp,
+                "Sign": signature
+            }
+            
+            response = await self.client.post(
+                f"{self.base_url}/bill/create",
+                json=payload,
+                headers=headers
             )
-        
-        return result.get("data", {})
+            
+            try:
+                result = response.json()
+            except ValueError as e:
+                # "Extra data" or "Expecting value" errors come from here
+                print(f"❌ CCPayment JSON Error. Status: {response.status_code}, Raw response: '{response.text}'")
+                # We assume it's a 502 Bad Gateway from the provider side if they send garbage
+                raise HTTPException(status_code=502, detail=f"Invalid response from payment provider: {response.text[:200]}")
+            
+            if result.get("code") != 10000:
+                print(f"❌ CCPayment API Error: {result}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"CCPayment API error: {result.get('msg', 'Unknown error')}"
+                )
+            
+            return result.get("data", {})
+        except HTTPException:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"CCPayment Service Init Error: {str(e)}")
     
     async def create_withdrawal(
         self,
