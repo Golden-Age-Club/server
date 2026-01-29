@@ -99,7 +99,22 @@ class PGProviderClient:
                 detail=f"PG API error: {exc.response.text}",
             ) from exc
 
-        return response.json()
+        data = response.json()
+
+        # Filter providers
+        if "providers" in data and isinstance(data["providers"], list):
+            excluded_providers = [ 'pgsoft', 'ferhub_pgsoft', 'ferhub_egt']
+            data["providers"] = [
+                p for p in data["providers"]
+                if not any(
+                    ex in (p.get('code', '') or '').lower() or 
+                    ex in (p.get('title', '') or '').lower() or 
+                    ex in (p.get('uniq_name', '') or '').lower()
+                    for ex in excluded_providers
+                )
+            ]
+
+        return data
 
     async def update_webhook_url(self, webhook_url: str) -> Dict[str, Any]:
         if not self.app_id or not self.api_key:
@@ -144,7 +159,7 @@ class PGProviderClient:
                 detail=f"PG API error: {exc.response.text}",
             ) from exc
             
-    async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
+    async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None, excluded_providers: Optional[list] = None) -> Dict[str, Any]:
         global _games_cache
         
         if not self.app_id or not self.api_key:
@@ -197,6 +212,18 @@ class PGProviderClient:
 
         # Filter logic
         all_games = _games_cache["data"]
+        
+        # Exclude specific providers as per requirement (egt, pgsoft)
+        excluded_providers = ['egt', 'pgsoft', 'ferhub_pgsoft', 'ferhub_egt']
+        all_games = [
+            g for g in all_games
+            if not any(
+                p in (g.get('provider_code', '') or '').lower() or 
+                p in (g.get('provider_title', '') or '').lower() or 
+                p in (g.get('uniq_provider', '') or '').lower()
+                for p in excluded_providers
+            )
+        ]
         
         if provider_id and provider_id != 'all':
             all_games = [

@@ -76,6 +76,7 @@ async def get_pg_games(
     provider_id: Optional[str] = Query(None, description="Filter by provider"),
     search: Optional[str] = Query(None, description="Search term")
 ):
+
     try:
         data = await provider.get_games(page=page, limit=limit, provider_id=provider_id, search=search)
         return data

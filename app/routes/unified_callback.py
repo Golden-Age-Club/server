@@ -274,7 +274,9 @@ async def unified_callback(
                 "display_name": user.get("username", "Player"),
                 "gender": user.get("gender", "Male"),
                 "country": user.get("country", "TR"),
-                "player_id": user.get("telegram_id") or user_id_str
+                "player_id": user.get("telegram_id") or user_id_str,
+                "city": user.get("city", "Istanbul"),
+                "email": user.get("email", "")
             }
 
         else:
