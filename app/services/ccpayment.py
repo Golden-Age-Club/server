@@ -3,6 +3,7 @@ import hmac
 import time
 from typing import Dict, Any, Protocol
 import httpx
+import traceback
 from fastapi import HTTPException
 from app.config import get_settings
 
