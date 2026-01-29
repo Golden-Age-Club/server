@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     API_PORT: int = int(os.environ.get("PORT", 8000))
     WEBHOOK_URL: str = Field(default="http://localhost:8000/api/webhook/ccpayment")
     
+    # Static IP Proxy (QuotaGuard)
+    QUOTAGUARDSTATIC_URL: str = Field(default=None)
+    
     # Testing
     TESTING_MODE: bool = Field(default=False)
     

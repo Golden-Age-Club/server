@@ -23,7 +23,17 @@ class CCPaymentClient:
         self.app_id = settings.CCPAYMENT_APP_ID
         self.app_secret = settings.CCPAYMENT_APP_SECRET
         self.base_url = settings.CCPAYMENT_API_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+        
+        # Configure proxy if available (QuotaGuard Static)
+        proxies = None
+        if settings.QUOTAGUARDSTATIC_URL:
+            proxies = {
+                "http://": settings.QUOTAGUARDSTATIC_URL,
+                "https://": settings.QUOTAGUARDSTATIC_URL
+            }
+            print("🔒 CCPayment Service: Using Static IP Proxy")
+            
+        self.client = httpx.AsyncClient(timeout=30.0, proxies=proxies)
     
     def _generate_signature(self, timestamp: str, data: Dict[str, Any]) -> str:
         sorted_params = sorted(data.items())
