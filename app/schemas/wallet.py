@@ -23,6 +23,7 @@ class TransactionResponse(BaseModel):
     created_at: datetime
     payment_url: Optional[str] = None
     payment_address: Optional[str] = None
+    merchant_order_id: Optional[str] = None
 
 class BalanceResponse(BaseModel):
     user_id: str

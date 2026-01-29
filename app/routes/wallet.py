@@ -70,7 +70,8 @@ async def create_deposit(
         status=transaction["status"],
         created_at=transaction["created_at"],
         payment_url=transaction.get("payment_url"),
-        payment_address=transaction.get("payment_address")
+        payment_address=transaction.get("payment_address"),
+        merchant_order_id=transaction.get("merchant_order_id")
     )
 
 @router.post("/withdraw", response_model=TransactionResponse)
@@ -120,7 +121,8 @@ async def create_withdrawal(
         amount=transaction["amount"],
         currency=transaction["currency"],
         status=transaction["status"],
-        created_at=transaction["created_at"]
+        created_at=transaction["created_at"],
+        merchant_order_id=transaction.get("merchant_order_id")
     )
 
 @router.get("/balance", response_model=BalanceResponse)

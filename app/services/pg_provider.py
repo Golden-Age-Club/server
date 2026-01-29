@@ -27,6 +27,8 @@ class CasinoGameProvider(Protocol):
         ...
     async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         ...
+    async def update_webhook_url(self, webhook_url: str) -> Dict[str, Any]:
+        ...
     async def launch_game(
         self,
         game_id: int,
@@ -335,7 +337,14 @@ class MockPGProvider:
             "categories": [],
         }
 
-    async def get_games(self, page: int = 1, limit: int = 20) -> Dict[str, Any]:
+    async def update_webhook_url(self, webhook_url: str) -> Dict[str, Any]:
+        return {
+            "status": "success",
+            "webhook_url": webhook_url,
+            "mock": True
+        }
+
+    async def get_games(self, page: int = 1, limit: int = 20, provider_id: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         games = [
             {
                 "categories": ["51"],
