@@ -86,9 +86,16 @@ class CCPaymentClient:
             headers=headers
         )
         
-        result = response.json()
+        try:
+            result = response.json()
+        except ValueError as e:
+            # "Extra data" or "Expecting value" errors come from here
+            print(f"❌ CCPayment JSON Error. Status: {response.status_code}, Raw response: '{response.text}'")
+            # We assume it's a 502 Bad Gateway from the provider side if they send garbage
+            raise HTTPException(status_code=502, detail=f"Invalid response from payment provider: {response.text[:200]}")
         
         if result.get("code") != 10000:
+            print(f"❌ CCPayment API Error: {result}")
             raise HTTPException(
                 status_code=400,
                 detail=f"CCPayment API error: {result.get('msg', 'Unknown error')}"
