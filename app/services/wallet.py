@@ -62,13 +62,20 @@ class WalletService:
             transaction = await self.transaction_repo.get_by_id(transaction_id)
             return transaction
             
+        except HTTPException:
+            await self.transaction_repo.update_status(
+                transaction_id=transaction_id,
+                status=TransactionStatus.FAILED,
+                error_message="Payment Provider Error"
+            )
+            raise
         except Exception as e:
             await self.transaction_repo.update_status(
                 transaction_id=transaction_id,
                 status=TransactionStatus.FAILED,
                 error_message=str(e)
             )
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=f"Wallet Deposit Error: {str(e)}")
     
     async def create_withdrawal(
         self,
