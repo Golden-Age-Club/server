@@ -120,12 +120,22 @@ class CCPaymentClient:
             # Config: https://admin.ccpayment.com/ccpayment/v2
             # We want: https://admin.ccpayment.com/ccpayment/v1/concise/url/get
             
-            # Correct Endpoint for Hosted Checkout (Trying v2)
-            # User reported "merchant account can only call api of version 2" when using v1.
-            # So we will try the v2 equivalent of the hosted checkout endpoint.
+            # Correct Endpoint for Hosted Checkout
+            # According to docs, Hosted Checkout is ALWAYS v1/concise/url/get.
+            # The "merchant account can only call api of version 2" error likely refers to 
+            # the App ID / Secret being a V2 key pair, which might be incompatible with V1 endpoints
+            # OR we need to use a specific V2-compatible URL that is not documented as "concise".
+            # However, search results insist on 'v1/concise/url/get'.
+            # Let's try to fetch the URL again but ensuring we use the right base.
+            
+            # Reverting to v1 as it is the only documented one.
+            # If this fails again with "version 2", the user might need to regenerate keys as v1 
+            # OR we try the Native Checkout v1 endpoint if v2 allows it.
+            
+            base_url = self.base_url.replace("/v2", "/v1")
             
             response = await self.client.post(
-                f"{self.base_url}/concise/url/get",
+                f"{base_url}/concise/url/get",
                 json=payload,
                 headers=headers
             )
