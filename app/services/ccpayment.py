@@ -111,31 +111,48 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Correct Endpoint for Hosted Checkout
-            # Base URL is https://admin.ccpayment.com/ccpayment/v2 in config, 
-            # but this endpoint is v1 sometimes? 
-            # Let's look at the config. api_url is .../v2.
-            # We need to be careful with the path.
-            # If config is .../v2, we might need to replace it or just append if it was just host.
-            # Config: https://admin.ccpayment.com/ccpayment/v2
-            # We want: https://admin.ccpayment.com/ccpayment/v1/concise/url/get
+            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
+            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
+            # Documentation payload: orderId, price, product, returnUrl, notifyUrl
             
-            # Correct Endpoint for Hosted Checkout
-            # According to docs, Hosted Checkout is ALWAYS v1/concise/url/get.
-            # The "merchant account can only call api of version 2" error likely refers to 
-            # the App ID / Secret being a V2 key pair, which might be incompatible with V1 endpoints
-            # OR we need to use a specific V2-compatible URL that is not documented as "concise".
-            # However, search results insist on 'v1/concise/url/get'.
-            # Let's try to fetch the URL again but ensuring we use the right base.
+            payload = {
+                "orderId": order_id,
+                "price": str(amount),
+                "product": product_name,
+                "expiredAt": int(time.time()) + 3600, # 1 hour validity
+                # "buyerEmail": "", # Optional
+                # "generateCheckoutURL": True # Implicit or required depending on endpoint
+            }
             
-            # Reverting to v1 as it is the only documented one.
-            # If this fails again with "version 2", the user might need to regenerate keys as v1 
-            # OR we try the Native Checkout v1 endpoint if v2 allows it.
+            if notify_url:
+                payload["notifyUrl"] = notify_url
+            if return_url:
+                payload["returnUrl"] = return_url
             
-            base_url = self.base_url.replace("/v2", "/v1")
+            # Signature generation logic might be same or different for v2.
+            # Assuming same 'app_secret' HMAC-SHA256 but simplified payload keys.
+            # Let's hope the signature method is consistent across versions.
             
+            signature = self._generate_signature(timestamp, payload)
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Appid": self.app_id,
+                "Timestamp": timestamp,
+                "Sign": signature
+            }
+            
+            # Endpoint construction
+            # Config base_url is likely ".../ccpayment/v2"
+            # Target is ".../ccpayment/v2/createInvoiceUrl"
+            # So just append "/createInvoiceUrl"
+            
+            # Safely handle the path construction
+            url_path = "/createInvoiceUrl"
+            full_url = f"{self.base_url}{url_path}"
+             
             response = await self.client.post(
-                f"{base_url}/concise/url/get",
+                full_url,
                 json=payload,
                 headers=headers
             )
