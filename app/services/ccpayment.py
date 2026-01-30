@@ -81,15 +81,26 @@ class CCPaymentClient:
             # V2 Timestamp: Seconds (10 digits)
             timestamp = str(int(time.time()))
             
-            # V2 Payload
+            # V2 Payload for bill/create (Native Checkout)
+            # Documentation usually specifies: merchant_order_id, amount, currency (or token_id), remark
+            # But for V2 Invoice/Bill:
+            # Common V2 params: orderId, amount, product, etc.
+            # Let's try standardizing:
+            # - orderId
+            # - amount (instead of price)
+            # - returnUrl
+            # - notifyUrl
+            
             payload = {
                 "orderId": order_id,
-                "price": str(amount),
-                "product": product_name,
-                "expiredAt": int(time.time()) + 3600, # 1 hour validity
+                "amount": str(amount), # Changed 'price' to 'amount' for bill/create? verification needed
+                "product": product_name, # or 'remark'
+                "expiredAt": int(time.time()) + 3600,
                 "fiatId": 1033 # USD
-                # "appId": self.app_id # Standard docs say header only
+                # "logo": "..." 
             }
+            
+            # If bill/create fails with param error, we know we hit the endpoint.
             
             if notify_url:
                 payload["notifyUrl"] = notify_url
@@ -134,10 +145,9 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Use Standard V2 Endpoint: /bill/create
-            # "createInvoiceUrl" might be non-standard or V1-wrapped.
-            # bill/create is the core V2 "Create Order" endpoint.
-            full_url = "https://admin.ccpayment.com/ccpayment/v2/bill/create"
+            # Use User-Provided URL (ccpayment.com) because admin.ccpayment.com returned 404
+            # Try ccpayment.com with bill/create
+            full_url = "https://ccpayment.com/ccpayment/v2/bill/create"
              
             response = await self.client.post(
                 full_url,
