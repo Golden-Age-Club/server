@@ -47,6 +47,16 @@ class CCPaymentClient:
         ).hexdigest()
         
         return signature
+
+    def _generate_v2_signature(self, timestamp: str, body_str: str) -> str:
+        """
+        V2 Signature: SHA256(AppID + AppSecret + Timestamp + Body)
+        """
+        # Concatenate: AppID + AppSecret + Timestamp + Body
+        raw_str = f"{self.app_id}{self.app_secret}{timestamp}{body_str}"
+        
+        # SHA256 Hash
+        return hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
     
     def verify_webhook_signature(self, timestamp: str, sign: str, data: Dict[str, Any]) -> bool:
         """Verify webhook signature from CCPayment"""
@@ -115,6 +125,10 @@ class CCPaymentClient:
             # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
             # Documentation payload: orderId, price, product, returnUrl, notifyUrl
             
+            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
+            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
+            # Documentation payload: orderId, price, product, returnUrl, notifyUrl
+            
             payload = {
                 "orderId": order_id,
                 "price": str(amount),
@@ -129,29 +143,25 @@ class CCPaymentClient:
             if return_url:
                 payload["returnUrl"] = return_url
             
-            # Signature generation logic might be same or different for v2.
-            # Assuming same 'app_secret' HMAC-SHA256 but simplified payload keys.
-            # Let's hope the signature method is consistent across versions.
+            # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
+            import json
+            body_str = json.dumps(payload) # Standard dumps
             
-            signature = self._generate_signature(timestamp, payload)
+            signature = self._generate_v2_signature(timestamp, body_str)
             
             headers = {
-                "Content-Type": "application/json",
+                "Content-Type": "application/json; charset=utf-8",
                 "Appid": self.app_id,
                 "Timestamp": timestamp,
                 "Sign": signature
             }
             
-            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
-            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
-            # Note: User URL does NOT have 'admin.' subdomain.
-            # We will use the exact URL provided by the user to avoid 404s.
-            
             full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
              
+            # Use content=body_str to ensure byte-for-byte match with signature
             response = await self.client.post(
                 full_url,
-                json=payload,
+                content=body_str,
                 headers=headers
             )
             
