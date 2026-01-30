@@ -81,26 +81,15 @@ class CCPaymentClient:
             # V2 Timestamp: Seconds (10 digits)
             timestamp = str(int(time.time()))
             
-            # V2 Payload for bill/create (Native Checkout)
-            # Documentation usually specifies: merchant_order_id, amount, currency (or token_id), remark
-            # But for V2 Invoice/Bill:
-            # Common V2 params: orderId, amount, product, etc.
-            # Let's try standardizing:
-            # - orderId
-            # - amount (instead of price)
-            # - returnUrl
-            # - notifyUrl
-            
+            # V2 Payload for createInvoiceUrl (Hosted Checkout)
+            # Keys: orderId, price, product, expiredAt, fiatId, returnUrl, notifyUrl
             payload = {
                 "orderId": order_id,
-                "amount": str(amount), # Changed 'price' to 'amount' for bill/create? verification needed
-                "product": product_name, # or 'remark'
+                "price": str(amount),
+                "product": product_name,
                 "expiredAt": int(time.time()) + 3600,
                 "fiatId": 1033 # USD
-                # "logo": "..." 
             }
-            
-            # If bill/create fails with param error, we know we hit the endpoint.
             
             if notify_url:
                 payload["notifyUrl"] = notify_url
@@ -110,8 +99,9 @@ class CCPaymentClient:
             import json
             import os
             
-            # Using standard JSON (with spaces)
-            body_str = json.dumps(payload) 
+            # Use COMPACT JSON (no spaces) for signature consistency
+            # separators=(',', ':') removes spaces after comma and colon
+            body_str = json.dumps(payload, separators=(',', ':'))
             
             # 1. READ RAW ENV VAR to avoid any Settings/Field magic
             raw_env_secret = os.environ.get("CCPAYMENT_APP_SECRET", "").strip()
@@ -127,33 +117,24 @@ class CCPaymentClient:
             print(f"DEBUG: Reading os.environ['CCPAYMENT_APP_SECRET'] directly.")
             print(f"DEBUG DETAILS: AppID={self.app_id} | EnvSecretLen={len(raw_env_secret)} | Time={timestamp}")
             print(f"DEBUG SECRET REPR: {repr(final_secret)}")
-            print(f"DEBUG SECRET HEX: {final_secret.encode('utf-8').hex()}")
             print(f"DEBUG RAW_STR REPR: {repr(raw_str)}")
-            print(f"DEBUG RAW_STR HEX: {raw_str.encode('utf-8').hex()}")
-            
-            # 5. Check consistency
-            calc_check = self.app_id + final_secret + timestamp + body_str
-            if raw_str != calc_check:
-                print("CRITICAL: Python String Concatenation Integrity Failure!")
             
             signature = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
             
             headers = {
-                "Content-Type": "application/json; charset=utf-8",
+                "Content-Type": "application/json",
                 "Appid": self.app_id, 
                 "Timestamp": timestamp,
                 "Sign": signature
             }
             
-            # Use Standard V2 Endpoint: /bill/create
-            # "createInvoiceUrl" failed on ccpayment.com.
-            # "bill/create" failed on ccpayment.com.
-            # Reverting to ADMIN domain which is standard for API.
-            full_url = "https://admin.ccpayment.com/ccpayment/v2/bill/create"
+            # Revert to createInvoiceUrl on ccpayment.com (Non-admin)
+            # This endpoint returned 400 (Signature Failed) which > 404.
+            full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
              
             response = await self.client.post(
                 full_url,
-                content=body_str,
+                content=body_str, # Send formatted compact string directly
                 headers=headers
             )
             
