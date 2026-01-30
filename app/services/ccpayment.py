@@ -145,9 +145,11 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Use User-Provided URL (ccpayment.com) because admin.ccpayment.com returned 404
-            # Try ccpayment.com with bill/create
-            full_url = "https://ccpayment.com/ccpayment/v2/bill/create"
+            # Use Standard V2 Endpoint: /bill/create
+            # "createInvoiceUrl" failed on ccpayment.com.
+            # "bill/create" failed on ccpayment.com.
+            # Reverting to ADMIN domain which is standard for API.
+            full_url = "https://admin.ccpayment.com/ccpayment/v2/bill/create"
              
             response = await self.client.post(
                 full_url,
