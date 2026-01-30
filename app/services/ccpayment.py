@@ -134,8 +134,10 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Use User-Provided URL (ccpayment.com) because admin.ccpayment.com returned 404
-            full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
+            # Use Standard V2 Endpoint: /bill/create
+            # "createInvoiceUrl" might be non-standard or V1-wrapped.
+            # bill/create is the core V2 "Create Order" endpoint.
+            full_url = "https://admin.ccpayment.com/ccpayment/v2/bill/create"
              
             response = await self.client.post(
                 full_url,
