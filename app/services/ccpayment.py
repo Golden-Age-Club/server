@@ -77,7 +77,8 @@ class CCPaymentClient:
         return_url: str = None
     ) -> Dict[str, Any]:
         try:
-            timestamp = str(int(time.time() * 1000))
+            # V2 requires timestamp in SECONDS (10 digits), not milliseconds.
+            timestamp = str(int(time.time()))
             
             # Using Hosted Checkout Page Integration endpoint
             # https://admin.ccpayment.com/ccpayment/v1/concise/url/get
