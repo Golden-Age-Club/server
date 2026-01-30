@@ -116,7 +116,9 @@ class CCPaymentClient:
             print(f"DEBUG: Reading os.environ['CCPAYMENT_APP_SECRET'] directly.")
             print(f"DEBUG DETAILS: AppID={self.app_id} | EnvSecretLen={len(raw_env_secret)} | Time={timestamp}")
             print(f"DEBUG SECRET REPR: {repr(final_secret)}")
+            print(f"DEBUG SECRET HEX: {final_secret.encode('utf-8').hex()}")
             print(f"DEBUG RAW_STR REPR: {repr(raw_str)}")
+            print(f"DEBUG RAW_STR HEX: {raw_str.encode('utf-8').hex()}")
             
             # 5. Check consistency
             calc_check = self.app_id + final_secret + timestamp + body_str
