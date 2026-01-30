@@ -97,21 +97,31 @@ class CCPaymentClient:
                 payload["returnUrl"] = return_url
             
             import json
-            # Using standard JSON (with spaces) as per debug logs
+            import os
+            
+            # Using standard JSON (with spaces)
             body_str = json.dumps(payload) 
             
-            # Helper to strip secret just in case
-            safe_secret = self.app_secret.strip()
+            # 1. READ RAW ENV VAR to avoid any Settings/Field magic
+            raw_env_secret = os.environ.get("CCPAYMENT_APP_SECRET", "").strip()
             
-            # Generate Signature
-            # Concatenate: AppID + AppSecret + Timestamp + Body
-            # DEBUG: Use markers to see boundaries clearly
-            raw_str = f"{self.app_id}{safe_secret}{timestamp}{body_str}"
+            # 2. RENAME VARIABLE to avoid shadowing
+            final_secret = raw_env_secret
             
-            print(f"DEBUG DETAILS: AppID={self.app_id} | SecretLen={len(safe_secret)} | Time={timestamp}")
-            print(f"DEBUG SECRET REPR: {repr(safe_secret)}")
-            print(f"DEBUG TIMESTAMP REPR: {repr(timestamp)}")
+            # 3. EXPLICIT CONCATENATION (No f-strings)
+            # Layout: AppID + Secret + Timestamp + Body
+            raw_str = self.app_id + final_secret + timestamp + body_str
+            
+            # 4. DEBUG LOGGING
+            print(f"DEBUG: Reading os.environ['CCPAYMENT_APP_SECRET'] directly.")
+            print(f"DEBUG DETAILS: AppID={self.app_id} | EnvSecretLen={len(raw_env_secret)} | Time={timestamp}")
+            print(f"DEBUG SECRET REPR: {repr(final_secret)}")
             print(f"DEBUG RAW_STR REPR: {repr(raw_str)}")
+            
+            # 5. Check consistency
+            calc_check = self.app_id + final_secret + timestamp + body_str
+            if raw_str != calc_check:
+                print("CRITICAL: Python String Concatenation Integrity Failure!")
             
             signature = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
             
