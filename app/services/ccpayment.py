@@ -142,14 +142,12 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Endpoint construction
-            # Config base_url is likely ".../ccpayment/v2"
-            # Target is ".../ccpayment/v2/createInvoiceUrl"
-            # So just append "/createInvoiceUrl"
+            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
+            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
+            # Note: User URL does NOT have 'admin.' subdomain.
+            # We will use the exact URL provided by the user to avoid 404s.
             
-            # Safely handle the path construction
-            url_path = "/createInvoiceUrl"
-            full_url = f"{self.base_url}{url_path}"
+            full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
              
             response = await self.client.post(
                 full_url,
