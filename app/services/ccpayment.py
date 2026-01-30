@@ -145,8 +145,11 @@ class CCPaymentClient:
                 payload["returnUrl"] = return_url
             
             # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
-            # Some V2 examples imply AppId is in the body too.
-            payload["appId"] = self.app_id
+            
+            # Update: Add fiatId for USD (1033) to make price unambiguous ($20.00).
+            # Remove appId from body (likely header-only).
+            payload["fiatId"] = 1033 
+            # payload["appId"] = self.app_id # Removed to match standard docs
             
             import json
             # IMPORTANT: Use compact separators to ensure no extra whitespace 
@@ -157,7 +160,7 @@ class CCPaymentClient:
             
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
-                "AppId": self.app_id, # Changed from Appid to AppId
+                "Appid": self.app_id, # Reverted to Appid (Title case)
                 "Timestamp": timestamp,
                 "Sign": signature
             }
