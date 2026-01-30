@@ -145,7 +145,9 @@ class CCPaymentClient:
             
             # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
             import json
-            body_str = json.dumps(payload) # Standard dumps
+            # IMPORTANT: Use compact separators to ensure no extra whitespace 
+            # and exact match between signature and sent body on server side.
+            body_str = json.dumps(payload, separators=(',', ':'))
             
             signature = self._generate_v2_signature(timestamp, body_str)
             
