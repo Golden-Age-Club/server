@@ -105,11 +105,13 @@ class CCPaymentClient:
             
             # Generate Signature
             # Concatenate: AppID + AppSecret + Timestamp + Body
+            # DEBUG: Use markers to see boundaries clearly
             raw_str = f"{self.app_id}{safe_secret}{timestamp}{body_str}"
             
             print(f"DEBUG DETAILS: AppID={self.app_id} | SecretLen={len(safe_secret)} | Time={timestamp}")
-            print(f"DEBUG BODY: {body_str}")
-            print(f"DEBUG SIGNATURE INPUT: {raw_str}")
+            print(f"DEBUG SECRET REPR: {repr(safe_secret)}")
+            print(f"DEBUG TIMESTAMP REPR: {repr(timestamp)}")
+            print(f"DEBUG RAW_STR REPR: {repr(raw_str)}")
             
             signature = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
             
