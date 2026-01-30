@@ -54,6 +54,7 @@ class CCPaymentClient:
         """
         # Concatenate: AppID + AppSecret + Timestamp + Body
         raw_str = f"{self.app_id}{self.app_secret}{timestamp}{body_str}"
+        print(f"DEBUG SIGNATURE INPUT: {raw_str}")
         
         # SHA256 Hash
         return hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
@@ -146,26 +147,26 @@ class CCPaymentClient:
             
             # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
             
-            # Update: Add fiatId for USD (1033) to make price unambiguous ($20.00).
-            # Remove appId from body (likely header-only).
+            # Update: Add fiatId for USD (1033).
             payload["fiatId"] = 1033 
-            # payload["appId"] = self.app_id # Removed to match standard docs
             
             import json
-            # IMPORTANT: Use compact separators to ensure no extra whitespace 
-            # and exact match between signature and sent body on server side.
-            body_str = json.dumps(payload, separators=(',', ':'))
+            # REVERTING to standard JSON (with spaces) to see if that works.
+            # AND using admin.ccpayment.com base URL.
+            body_str = json.dumps(payload) 
             
             signature = self._generate_v2_signature(timestamp, body_str)
             
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
-                "Appid": self.app_id, # Reverted to Appid (Title case)
+                "Appid": self.app_id, 
                 "Timestamp": timestamp,
                 "Sign": signature
             }
             
-            full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
+            # Use Configured Base URL (https://admin.ccpayment.com/ccpayment/v2)
+            # This is the standard API host, user provided URL might have been marketing/web.
+            full_url = f"{self.base_url}/createInvoiceUrl"
              
             # Use content=body_str to ensure byte-for-byte match with signature
             response = await self.client.post(
