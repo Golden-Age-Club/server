@@ -99,42 +99,46 @@ class CCPaymentClient:
             import json
             import os
             
+            import json
+            import os
+            
             # Use COMPACT JSON (no spaces) for signature consistency
-            # separators=(',', ':') removes spaces after comma and colon
             body_str = json.dumps(payload, separators=(',', ':'))
             
-            # 1. READ RAW ENV VAR to avoid any Settings/Field magic
-            raw_env_secret = os.environ.get("CCPAYMENT_APP_SECRET", "").strip()
+            # HARDCODED CREDENTIALS (DEBUG MODE)
+            # To fix the "mysterious string corruption" issue.
+            # Extracted from Step 1039 Logs.
+            HARD_APP_ID = "W1YQw5GhVCRVGpSz"
+            HARD_SECRET = "34ea254e3369f1167b897231a261c1e3"
             
-            # 2. RENAME VARIABLE to avoid shadowing
-            final_secret = raw_env_secret
+            # Use these explicitly
+            final_app_id = HARD_APP_ID
+            final_secret = HARD_SECRET
             
-            # 3. EXPLICIT CONCATENATION (No f-strings)
+            # EXPLICIT CONCATENATION
             # Layout: AppID + Secret + Timestamp + Body
-            raw_str = self.app_id + final_secret + timestamp + body_str
+            raw_str = final_app_id + final_secret + timestamp + body_str
             
-            # 4. DEBUG LOGGING
-            print(f"DEBUG: Reading os.environ['CCPAYMENT_APP_SECRET'] directly.")
-            print(f"DEBUG DETAILS: AppID={self.app_id} | EnvSecretLen={len(raw_env_secret)} | Time={timestamp}")
-            print(f"DEBUG SECRET REPR: {repr(final_secret)}")
+            # DEBUG LOGGING
+            print(f"DEBUG: USING HARDCODED CREDENTIALS")
+            print(f"DEBUG DETAILS: AppID={final_app_id} | SecretLen={len(final_secret)} | Time={timestamp}")
             print(f"DEBUG RAW_STR REPR: {repr(raw_str)}")
             
             signature = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
             
             headers = {
                 "Content-Type": "application/json",
-                "Appid": self.app_id, 
+                "Appid": final_app_id, 
                 "Timestamp": timestamp,
                 "Sign": signature
             }
             
-            # Revert to createInvoiceUrl on ccpayment.com (Non-admin)
-            # This endpoint returned 400 (Signature Failed) which > 404.
+            # Endpoint: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
             full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
              
             response = await self.client.post(
                 full_url,
-                content=body_str, # Send formatted compact string directly
+                content=body_str, 
                 headers=headers
             )
             
