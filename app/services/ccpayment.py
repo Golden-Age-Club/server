@@ -145,6 +145,9 @@ class CCPaymentClient:
                 payload["returnUrl"] = return_url
             
             # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
+            # Some V2 examples imply AppId is in the body too.
+            payload["appId"] = self.app_id
+            
             import json
             # IMPORTANT: Use compact separators to ensure no extra whitespace 
             # and exact match between signature and sent body on server side.
@@ -154,7 +157,7 @@ class CCPaymentClient:
             
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
-                "Appid": self.app_id,
+                "AppId": self.app_id, # Changed from Appid to AppId
                 "Timestamp": timestamp,
                 "Sign": signature
             }
