@@ -78,66 +78,17 @@ class CCPaymentClient:
         return_url: str = None
     ) -> Dict[str, Any]:
         try:
-            # V2 requires timestamp in SECONDS (10 digits), not milliseconds.
+            # V2 Timestamp: Seconds (10 digits)
             timestamp = str(int(time.time()))
             
-            # Using Hosted Checkout Page Integration endpoint
-            # https://admin.ccpayment.com/ccpayment/v1/concise/url/get
-            
-            payload = {
-                "app_id": self.app_id,
-                "merchant_order_id": order_id,
-                "product_price": str(amount),
-                "order_valid_period": 3600, # 1 hour validity
-                "product_name": product_name,
-                # "fiat_currency_id": "", # Optional if using crypto
-                # "order_currency": currency, # Not needed for hosted page if letting user choose? 
-                # Actually for hosted page v1/concise/url/get, we usually send price.
-                # Let's verify if 'order_currency' is valid here.
-                # Documentation says 'product_price' and 'order_valid_period'.
-                # But to force a specific currency we might need another param or just pass it differently.
-                # For now let's stick to the hosted page generic flow where user selects coin, 
-                # OR if we want to force TRC20, we might need to check if we can pass it.
-                # Re-reading docs: "order_currency" might be for non-hosted or different endpoint.
-                # However, the user wants to deposit USDT.TRC20. 
-                # If we use concise/url/get, it opens a page. 
-                # Let's try to pass the amount and let user pick (or if we can pre-select).
-            }
-            
-            # Note: For concise/url/get, documentation usually requires:
-            # merchant_order_id, product_price, product_name, order_valid_period.
-            
-            if notify_url:
-                payload["notify_url"] = notify_url
-            if return_url:
-                payload["return_url"] = return_url
-            
-            # For hosted page, we might redirect user to this URL
-            
-            signature = self._generate_signature(timestamp, payload)
-            
-            headers = {
-                "Content-Type": "application/json",
-                "Appid": self.app_id,
-                "Timestamp": timestamp,
-                "Sign": signature
-            }
-            
-            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
-            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
-            # Documentation payload: orderId, price, product, returnUrl, notifyUrl
-            
-            # Correct Endpoint for V2 Hosted Checkout (createInvoiceUrl)
-            # User provided: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
-            # Documentation payload: orderId, price, product, returnUrl, notifyUrl
-            
+            # V2 Payload
             payload = {
                 "orderId": order_id,
                 "price": str(amount),
                 "product": product_name,
                 "expiredAt": int(time.time()) + 3600, # 1 hour validity
-                # "buyerEmail": "", # Optional
-                # "generateCheckoutURL": True # Implicit or required depending on endpoint
+                "fiatId": 1033 # USD
+                # "appId": self.app_id # Standard docs say header only
             }
             
             if notify_url:
@@ -145,17 +96,22 @@ class CCPaymentClient:
             if return_url:
                 payload["returnUrl"] = return_url
             
-            # V2 Signature Logic: SHA256(AppID + AppSecret + Timestamp + Body)
-            
-            # Update: Add fiatId for USD (1033).
-            payload["fiatId"] = 1033 
-            
             import json
-            # REVERTING to standard JSON (with spaces) to see if that works.
-            # AND using admin.ccpayment.com base URL.
+            # Using standard JSON (with spaces) as per debug logs
             body_str = json.dumps(payload) 
             
-            signature = self._generate_v2_signature(timestamp, body_str)
+            # Helper to strip secret just in case
+            safe_secret = self.app_secret.strip()
+            
+            # Generate Signature
+            # Concatenate: AppID + AppSecret + Timestamp + Body
+            raw_str = f"{self.app_id}{safe_secret}{timestamp}{body_str}"
+            
+            print(f"DEBUG DETAILS: AppID={self.app_id} | SecretLen={len(safe_secret)} | Time={timestamp}")
+            print(f"DEBUG BODY: {body_str}")
+            print(f"DEBUG SIGNATURE INPUT: {raw_str}")
+            
+            signature = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
             
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
@@ -164,11 +120,9 @@ class CCPaymentClient:
                 "Sign": signature
             }
             
-            # Use Configured Base URL (https://admin.ccpayment.com/ccpayment/v2)
-            # This is the standard API host, user provided URL might have been marketing/web.
-            full_url = f"{self.base_url}/createInvoiceUrl"
+            # Use User-Provided URL (ccpayment.com) because admin.ccpayment.com returned 404
+            full_url = "https://ccpayment.com/ccpayment/v2/createInvoiceUrl"
              
-            # Use content=body_str to ensure byte-for-byte match with signature
             response = await self.client.post(
                 full_url,
                 content=body_str,
@@ -189,6 +143,11 @@ class CCPaymentClient:
                 )
             
             return result.get("data", {})
+        except HTTPException:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"CCPayment Service Init Error: {str(e)}")
         except HTTPException:
             raise
         except Exception as e:
