@@ -1,139 +1,105 @@
+"""FastAPI application entry point."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from app.core.database import connect_to_mongo, close_mongo_connection, get_database
-from app.core.logging_config import setup_logging
-from app.middleware.request_id import RequestIDMiddleware
-from app.routes import wallet, webhook, auth, support, casino, unified_callback, user, transactions
-from app.config import get_settings
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from contextlib import asynccontextmanager
 import logging
 
-from fastapi.security import HTTPBearer
+from app.config import settings
+from app.database import database
+from app.api.v1 import api_router
+from app.core.exceptions import AppException
+from app.middleware.error_handler import (
+    app_exception_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    generic_exception_handler
+)
+from app.middleware.audit import AuditMiddleware
 
-settings = get_settings()
-security = HTTPBearer()
-
-# Add to verify_jwt_token logic or app description later?
-# Easiest is to add it to routes or global dependency if we want the lock icon for everything.
-# But for now, let's just use it in main.py to hint OpenAPI.
-
-setup_logging(log_level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
-logger = logging.getLogger(__name__)
-
-# ... (omitted)
-
-
-limiter = Limiter(key_func=get_remote_address)
-
-app = FastAPI(
-    title="Golden Age USDT Wallet API",
-    description="USDT Wallet Integration with CCPayment and Telegram Authentication",
-    version="1.0.0",
-    contact={
-        "name": "Golden Age Support",
-        "email": "support@goldenage.com",
-    },
-    license_info={
-        "name": "Proprietary",
-    },
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, settings.log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+logger = logging.getLogger(__name__)
 
-app.add_middleware(RequestIDMiddleware)
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    # Startup
+    await database.connect()
+    
+    yield
+    
+    # Shutdown
+    await database.disconnect()
 
-allowed_origins = settings.ALLOWED_ORIGINS.split(",")
+
+# Create FastAPI application
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Slot Machine Admin Backend API",
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan
+)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuditMiddleware)
 
-@app.on_event("startup")
-async def startup_db_client():
-    logger.info("🚀 Starting Golden Age USDT Wallet API...")
-    await connect_to_mongo()
-    logger.info(f"Testing mode: {settings.TESTING_MODE}")
-    logger.info(f"Allowed origins: {allowed_origins}")
-    logger.info(f"Log level: {settings.LOG_LEVEL}")
-    logger.info(f"Log format: {settings.LOG_FORMAT}")
-    # Removed aggressive keep-alive loop to prevent resource exhaustion
-    logger.info("✅ Application started successfully")
+# Exception handlers
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    logger.info("Shutting down application...")
-    await close_mongo_connection()
-    logger.info("✅ Application shutdown complete")
+# Include API routes
+app.include_router(api_router, prefix=settings.api_v1_prefix)
 
-# Include routers
-app.include_router(auth.router)
-app.include_router(wallet.router)
-app.include_router(webhook.router)
-app.include_router(casino.router)
-app.include_router(unified_callback.router)
-app.include_router(support.router)
-app.include_router(user.router)
-app.include_router(transactions.router)
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Golden Age USDT Wallet API",
-        "version": "1.0.0",
-        "testing_mode": settings.TESTING_MODE,
-        "docs": "/docs",
-        "health": "/health"
-    }
-
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health_check():
-    """
-    Health check endpoint with database connectivity verification
-    """
-    from datetime import datetime
+    """Health check endpoint."""
+    db_healthy = await database.health_check()
     
-    health_status = {
-        "status": "healthy",
-        "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "checks": {
-            "database": "unknown",
-            "payment_provider": "unknown"
-        }
+    return {
+        "status": "healthy" if db_healthy else "unhealthy",
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "database": "connected" if db_healthy else "disconnected"
     }
-    
-    try:
-        # Check database connectivity
-        db = await get_database()
-        await db.command('ping')
-        health_status["checks"]["database"] = "connected"
-        logger.debug("Health check: database connected")
-    except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["checks"]["database"] = f"error: {str(e)}"
-        logger.error(f"Health check failed: {e}")
-    
-    # Check payment provider status
-    if settings.TESTING_MODE:
-        health_status["checks"]["payment_provider"] = "mock"
-    else:
-        health_status["checks"]["payment_provider"] = "configured"
-    
-    return health_status
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint."""
+    return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "docs": "/docs" if settings.debug else "disabled in production"
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
+    
     uvicorn.run(
         "app.main:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-        reload=True
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.debug,
+        log_level=settings.log_level.lower()
     )
