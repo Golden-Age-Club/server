@@ -1,9 +1,16 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+from typing import Optional
 from functools import lru_cache
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"
+    )
+
     # CCPayment
     CCPAYMENT_APP_ID: str = Field(default="test_app_id")
     CCPAYMENT_APP_SECRET: str = Field(min_length=1)  # Required in Prod
@@ -25,7 +32,7 @@ class Settings(BaseSettings):
     WEBHOOK_URL: str = Field(default="http://localhost:8000/api/webhook/ccpayment")
     
     # Static IP Proxy (QuotaGuard)
-    QUOTAGUARDSTATIC_URL: str = Field(default=None)
+    QUOTAGUARDSTATIC_URL: Optional[str] = Field(default=None)
     
     # Testing
     TESTING_MODE: bool = Field(default=False)
@@ -54,10 +61,6 @@ class Settings(BaseSettings):
     
     # Support System
     ADMIN_WS_SECRET: str = Field(default="admin_secret_key_123", min_length=8) # Required in Prod
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 @lru_cache()
 def get_settings() -> Settings:
