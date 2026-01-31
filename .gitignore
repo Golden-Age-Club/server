@@ -1,68 +1,28 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Dependencies
+node_modules/
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-
-# Environment Variables
+# Environment variables
 .env
 .env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-*.cover
-.hypothesis/
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
+logs
 *.log
-logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Coverage
+coverage/
 
-# Docker
-docker-compose.override.yml
+# Build outputs
+dist/
+build/
 
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# OS
+# OS specific
+.DS_Store
 Thumbs.db
