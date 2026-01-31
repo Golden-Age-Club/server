@@ -23,14 +23,14 @@ MANIFEST
 
 # Virtual Environment
 venv/
-env/
 ENV/
+env/
 .venv
 
 # Environment Variables
 .env
 .env.local
-.env.*.local
+.env.production
 
 # IDE
 .vscode/
@@ -44,7 +44,7 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
-*.cover
+.tox/
 .hypothesis/
 
 # Logs
@@ -57,12 +57,26 @@ logs/
 *.sqlite3
 
 # Docker
-docker-compose.override.yml
+.dockerignore
 
-# Temporary files
-*.tmp
-*.temp
-.cache/
+# Project specific
+*.bak
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# OS
-Thumbs.db
+# Temporary / Test Scripts
+debug_*.py
+test_*.py
+verify_*.py
+simulate_*.py
+send_test_ticket.py
+generate_token.py
+get_valid_token.py
+create_confirmation_ticket.py
+create_ticket_test.py
+token.txt
+db_verification.log
+test_results.txt
+
+

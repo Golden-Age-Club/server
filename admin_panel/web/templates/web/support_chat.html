@@ -1,0 +1,247 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+<style>
+    .chat-container {
+        height: 650px;
+        display: flex;
+        flex-direction: column;
+        background: #f4f6f9;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e0e0e0;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    /* Custom Scrollbar */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    .message-wrapper {
+        display: flex;
+        flex-direction: column;
+        max-width: 75%;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .message-wrapper.user {
+        align-self: flex-start;
+    }
+
+    .message-wrapper.admin {
+        align-self: flex-end;
+        align-items: flex-end;
+    }
+
+    .message-bubble {
+        padding: 12px 16px;
+        border-radius: 18px;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    /* User Bubble (Left, Gray) */
+    .message-wrapper.user .message-bubble {
+        background: #ffffff;
+        color: #333333;
+        border-bottom-left-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+
+    /* Admin Bubble (Right, Blue) */
+    .message-wrapper.admin .message-bubble {
+        background: #007bff;
+        color: #ffffff;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message-meta {
+        font-size: 0.75rem;
+        margin-top: 5px;
+        color: #888;
+        padding: 0 4px;
+    }
+
+    .message-wrapper.admin .message-meta {
+        text-align: right;
+    }
+
+    .chat-input-area {
+        background: white;
+        padding: 15px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chat-input-area input {
+        border-radius: 20px;
+        padding-left: 20px;
+        border: 1px solid #ced4da;
+    }
+
+    .chat-input-area input:focus {
+        box-shadow: none;
+        border-color: #80bdff;
+    }
+
+    .btn-send {
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.1s;
+    }
+
+    .btn-send:active {
+        transform: scale(0.95);
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <a href="{% url 'web:support_list' %}" class="btn btn-outline-light text-secondary btn-sm mr-2"
+                            style="border-radius: 20px;">
+                            <i class="fas fa-chevron-left"></i> Back
+                        </a>
+                        <span class="h5 mb-0 align-middle font-weight-bold">
+                            Tickets <span class="text-muted">#{{ ticket_id|slice:"-6:" }}</span>
+                        </span>
+                        {% if ticket.status == 'open' %}
+                        <span class="badge badge-success ml-2 px-3 py-1" style="border-radius: 12px;">OPEN</span>
+                        {% else %}
+                        <span class="badge badge-secondary ml-2 px-3 py-1" style="border-radius: 12px;">RESOLVED</span>
+                        {% endif %}
+                    </div>
+                    {% if ticket.status == 'open' %}
+                    <form method="POST" action="{% url 'web:resolve_ticket' ticket_id %}"
+                        onsubmit="return confirm('Mark this ticket as resolved?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-success btn-sm font-weight-bold"
+                            style="border-radius: 20px;">
+                            <i class="fas fa-check"></i> Mark Resolved
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                <div class="card-body p-0">
+                    <div class="chat-container">
+                        <div id="chat-messages" class="chat-messages">
+                            <!-- Server-side rendered history -->
+                            {% for msg in messages %}
+                            <div class="message-wrapper {{ msg.sender_role }}">
+                                <div class="message-bubble">
+                                    {{ msg.content }}
+                                </div>
+                                <div class="message-meta">
+                                    {{ msg.sender_role|title }} • {{ msg.created_at|date:"H:i" }}
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-center text-muted mt-5" id="empty-state">
+                                <i class="far fa-comments fa-3x mb-3 text-secondary" style="opacity: 0.5;"></i>
+                                <p>No messages yet. Start the conversation!</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        {% if ticket.status == 'open' %}
+                        <div class="chat-input-area">
+                            <input type="text" id="message-input" class="form-control" placeholder="Type a message..."
+                                autocomplete="off">
+                            <button class="btn btn-primary btn-send" type="button" id="send-btn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary m-3 text-center mb-0" style="border-radius: 8px;">
+                            <i class="fas fa-lock"></i> This ticket is resolved.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ticketId = "{{ ticket_id }}";
+    // WebSocket removed as per request
+    // const wsUrl = `${protocol}://${window.location.hostname}:8000/api/support/ws/${ticketId}?token={{ admin_ws_token }}`;
+    // socket = new WebSocket(wsUrl);
+    const messagesDiv = document.getElementById('chat-messages');
+    const input = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const emptyState = document.getElementById('empty-state');
+
+    function scrollToBottom() {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function sendMessage() {
+        if (!input.value.trim()) return;
+        alert("Real-time chat is disabled. Please refresh to see new messages.");
+        input.value = '';
+    }
+
+    if (sendBtn) {
+        sendBtn.onclick = sendMessage;
+        input.onkeypress = function (e) {
+            if (e.key === 'Enter') sendMessage();
+        };
+    }
+    
+    // Auto scroll on load
+    scrollToBottom();
+</script>
+{% endblock %}

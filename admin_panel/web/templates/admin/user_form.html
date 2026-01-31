@@ -1,0 +1,59 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">Edit User: {% if mongo_user.username %}{{ mongo_user.username }}{% elif
+                    mongo_user.telegram_id %}{{ mongo_user.telegram_id }}{% else %}Email Player{% endif %}</h3>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Telegram ID</label>
+                        <input type="text" class="form-control"
+                            value="{% if mongo_user.telegram_id %}{{ mongo_user.telegram_id }}{% else %}N/A (Email User){% endif %}"
+                            disabled>
+                    </div>
+
+                    {% for field in form %}
+                    <div class="form-group">
+                        <label>{{ field.label }}</label>
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="custom-control custom-switch">
+                            {{ field }}
+                            <label class="custom-control-label" for="{{ field.id_for_label }}"></label>
+                        </div>
+                        {% else %}
+                        {{ field }}
+                        {{ field.errors }}
+                        {% endif %}
+                        {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <div class="form-group">
+                        <label>Joined Date</label>
+                        <input type="text" class="form-control" value="{{ mongo_user.created_at }}" disabled>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="{% url 'web:user_list' %}" class="btn btn-default">Cancel</a>
+
+                    <a href="{% url 'web:transactions_list' %}?q={{ mongo_user.id }}" class="btn btn-info float-right">
+                        View Transactions
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

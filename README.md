@@ -1,335 +1,354 @@
-# Slot Machine Admin Backend
+# Golden Age Casino - USDT Wallet API
 
-**Production-ready admin backend system for slot machine/casino platforms with comprehensive security, audit logging, and role-based access control.**
+> **Telegram Game Backend** with USDT wallet integration, Telegram WebApp authentication, and CCpayment processing.
+
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)](https://fastapi.tiangolo.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-4.4+-green.svg)](https://www.mongodb.com/)
+
+---
 
 ## 🎯 Features
 
-- **Secure Authentication**: JWT tokens with refresh token rotation, MFA (TOTP), account locking
-- **Role-Based Access Control**: 7 system roles with 30+ granular permissions
-- **Comprehensive Audit Logging**: All admin actions logged with sensitive data masking
-- **MongoDB with Transactions**: Replica set support for ACID transactions
-- **Financial Safety**: Optimistic locking, idempotency keys, dual approval workflows
-- **Production Ready**: Docker Compose setup, health checks, error handling
+- ✅ **Telegram WebApp Authentication** - Secure HMAC-SHA256 validation
+- ✅ **JWT Token System** - Session management with configurable expiration
+- ✅ **USDT Wallet** - Deposit and withdrawal via CCpayment
+- ✅ **MongoDB Integration** - Async operations with Motor driver
+- ✅ **Atomic Transactions** - Race-condition safe balance operations
+- ✅ **Webhook Processing** - Secure payment notification handling
+- ✅ **Auto-Registration** - Seamless user onboarding
+- ✅ **Structured Logging** - JSON logs with request ID tracking
+- ✅ **Rate Limiting** - DDoS protection
+- ✅ **Comprehensive Testing** - Full test suite included
 
-## 📋 System Roles
-
-1. **Super Admin** - Full system access
-2. **Finance Manager** - Wallet, deposits, withdrawals, financial reports
-3. **Risk Manager** - Risk control, fraud prevention, user restrictions
-4. **Customer Support** - User management, basic reports
-5. **Marketing Manager** - Bonuses, promotions, VIP management
-6. **Analyst** - Read-only access to reports
-7. **Game Manager** - Game configuration, bet records
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
+- Python 3.8+
+- MongoDB 4.4+
+- Telegram Bot Token (from @BotFather)
 
-### 1. Clone and Setup
-
-```bash
-cd golden-age-crm
-cp .env.example .env
-```
-
-### 2. Configure Environment
-
-Edit `.env` and set:
-- `SECRET_KEY` (generate with: `openssl rand -hex 32`)
-- `INITIAL_ADMIN_USERNAME`
-- `INITIAL_ADMIN_EMAIL`
-- `INITIAL_ADMIN_PASSWORD`
-
-### 3. Start Services
+### Installation
 
 ```bash
-docker-compose up -d
-```
+# Clone repository
+cd golden-age-club
 
-This starts:
-- MongoDB replica set (3 nodes) on ports 27017, 27018, 27019
-- Redis on port 6379
-- FastAPI application on port 8000
-- MongoDB Express (UI) on port 8081
-
-### 4. Seed Database
-
-```bash
-# Wait for MongoDB replica set to initialize (30 seconds)
-sleep 30
-
-# Run seeding script
-docker-compose exec api python scripts/seed_database.py
-```
-
-### 5. Access Application
-
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **MongoDB Express**: http://localhost:8081 (admin/admin123)
-- **Health Check**: http://localhost:8000/health
-
-## 📚 API Documentation
-
-### Authentication Endpoints
-
-#### Login
-```bash
-POST /api/v1/admin/auth/login
-{
-  "username": "superadmin",
-  "password": "ChangeMe123!"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "access_token": "eyJhbGc...",
-    "refresh_token": "eyJhbGc...",
-    "token_type": "bearer",
-    "mfa_required": false,
-    "session_id": "sess_..."
-  }
-}
-```
-
-#### Setup MFA
-```bash
-GET /api/v1/admin/auth/mfa/setup
-Authorization: Bearer <access_token>
-```
-
-#### Get Current User
-```bash
-GET /api/v1/admin/auth/me
-Authorization: Bearer <access_token>
-```
-
-### Admin Management Endpoints
-
-#### Create Admin
-```bash
-POST /api/v1/admin/admins
-Authorization: Bearer <access_token>
-{
-  "username": "jane.doe",
-  "email": "jane@example.com",
-  "password": "SecurePass123!",
-  "roles": ["customer_support"]
-}
-```
-
-#### List Admins
-```bash
-GET /api/v1/admin/admins?status=active&page=1&page_size=20
-Authorization: Bearer <access_token>
-```
-
-#### Update Admin Status
-```bash
-PATCH /api/v1/admin/admins/{admin_id}/status
-Authorization: Bearer <access_token>
-{
-  "status": "suspended",
-  "reason": "Policy violation"
-}
-```
-
-## 🏗️ Project Structure
-
-```
-golden-age-crm/
-├── app/
-│   ├── api/v1/          # API endpoints
-│   ├── core/            # Security, permissions, audit
-│   ├── models/          # Pydantic models
-│   ├── schemas/         # Request/response schemas
-│   ├── services/        # Business logic
-│   ├── middleware/      # Request/response middleware
-│   ├── config.py        # Configuration
-│   ├── database.py      # MongoDB connection
-│   ├── dependencies.py  # FastAPI dependencies
-│   └── main.py          # Application entry point
-├── scripts/
-│   └── seed_database.py # Database seeding
-├── docker-compose.yml   # Docker services
-├── Dockerfile           # Application container
-├── requirements.txt     # Python dependencies
-└── .env.example         # Environment template
-```
-
-## 🔒 Security Features
-
-### Authentication
-- **Password Hashing**: bcrypt with 12 rounds
-- **JWT Tokens**: Short-lived access (15 min), long-lived refresh (7 days)
-- **MFA**: TOTP with QR code generation
-- **Account Locking**: 5 failed attempts = 15 min lockout
-- **Session Management**: Redis-based with expiration
-
-### Authorization
-- **RBAC**: Role-based access control with permission decorators
-- **Wildcard Permissions**: Flexible permission matching
-- **Audit Logging**: All actions logged with IP, user agent, before/after state
-- **Sensitive Data Masking**: Passwords, tokens, secrets masked in logs
-
-### Data Protection
-- **Optimistic Locking**: Version-based concurrency control
-- **Idempotency Keys**: Prevent duplicate operations
-- **Soft Deletes**: Preserve data integrity
-- **TTL Indexes**: Automatic log retention (7 years)
-
-## 🧪 Testing
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run tests
-pytest tests/ -v --cov=app
-
-# Run specific test file
-pytest tests/test_auth.py -v
-```
-
-## 📊 Monitoring
-
-### Health Check
-```bash
-curl http://localhost:8000/health
-```
-
-Response:
-```json
-{
-  "status": "healthy",
-  "version": "1.0.0",
-  "environment": "development",
-  "database": "connected"
-}
-```
-
-### Logs
-```bash
-# View application logs
-docker-compose logs -f api
-
-# View MongoDB logs
-docker-compose logs -f mongo1
-```
-
-## 🔧 Development
-
-### Local Development (without Docker)
-
-```bash
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Start MongoDB and Redis (via Docker)
-docker-compose up -d mongo1 mongo2 mongo3 redis mongo-init
+# Configure environment
+cp .env.example .env
+# Edit .env with your configuration
 
 # Run application
 python -m app.main
 ```
 
-### Code Quality
+The API will be available at `http://localhost:8000`
 
-```bash
-# Format code
-black app/
+### API Documentation
 
-# Sort imports
-isort app/
-
-# Type checking
-mypy app/
-
-# Linting
-flake8 app/
-```
-
-## 📝 Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MONGODB_URL` | MongoDB connection string | `mongodb://localhost:27017/?replicaSet=rs0` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` |
-| `SECRET_KEY` | JWT secret key (32+ chars) | **Required** |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token expiration | `15` |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiration | `7` |
-| `MFA_ISSUER_NAME` | MFA issuer name | `Slot Admin` |
-| `RATE_LIMIT_LOGIN_ATTEMPTS` | Max login attempts | `5` |
-| `RATE_LIMIT_LOGIN_WINDOW_MINUTES` | Login rate limit window | `15` |
-
-## 🚨 Production Deployment
-
-### Security Checklist
-
-- [ ] Change `SECRET_KEY` to a strong random value
-- [ ] Change initial admin password immediately
-- [ ] Set `DEBUG=false`
-- [ ] Configure `IP_WHITELIST` for admin access
-- [ ] Enable MFA for all admin accounts
-- [ ] Use MongoDB Atlas or managed MongoDB service
-- [ ] Configure SSL/TLS for MongoDB and Redis
-- [ ] Set up monitoring and alerting
-- [ ] Configure backup strategy
-- [ ] Review and adjust rate limits
-
-### Recommended Infrastructure
-
-- **MongoDB**: MongoDB Atlas (M10+ cluster with replica set)
-- **Redis**: Redis Cloud or AWS ElastiCache
-- **Application**: AWS ECS, Google Cloud Run, or Kubernetes
-- **Load Balancer**: AWS ALB, Google Cloud Load Balancer
-- **Monitoring**: Datadog, New Relic, or CloudWatch
-
-## 📖 API Reference
-
-Full API documentation available at:
+Once running, visit:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
-
-## 🤝 Contributing
-
-This is a production system. All changes must:
-1. Include tests with 80%+ coverage
-2. Pass linting and type checking
-3. Include audit logging for mutations
-4. Follow RBAC permission model
-5. Update documentation
-
-## 📄 License
-
-Proprietary - All rights reserved
-
-## 🆘 Support
-
-For issues or questions:
-1. Check logs: `docker-compose logs -f api`
-2. Verify MongoDB replica set: `docker-compose exec mongo1 mongosh --eval "rs.status()"`
-3. Check health endpoint: `curl http://localhost:8000/health`
-
-## 🎉 Next Steps
-
-After Phase 1 completion, implement:
-- **Phase 2**: User & Wallet Management
-- **Phase 3**: Bets, Games & VIP
-- **Phase 4**: Risk Control & Bonus
-- **Phase 5**: Reporting & Optimization
-- **Phase 6**: Production Readiness
+- **Health Check**: http://localhost:8000/health
 
 ---
 
-**Built with FastAPI, MongoDB, Redis, and ❤️**
+## 📚 API Endpoints
+
+### Authentication
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/login` | POST | Login with Telegram initData |
+| `/api/auth/me` | GET | Get current user profile |
+| `/api/auth/refresh` | POST | Refresh access token |
+
+### Wallet
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/wallet/deposit` | POST | Create deposit order | ✅ |
+| `/api/wallet/withdraw` | POST | Create withdrawal request | ✅ |
+| `/api/wallet/balance` | GET | Get current balance | ✅ |
+| `/api/wallet/transactions` | GET | Get transaction history | ✅ |
+| `/api/wallet/transaction/{id}` | GET | Get transaction details | ✅ |
+
+### Webhooks
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/webhook/ccpayment` | POST | CCpayment webhook notifications |
+
+---
+
+## 🔐 Authentication
+
+The API supports two authentication methods:
+
+### 1. JWT Token (Recommended)
+
+```javascript
+// Login to get token
+const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        init_data: window.Telegram.WebApp.initData 
+    })
+});
+
+const { access_token } = await response.json();
+
+// Use token in subsequent requests
+fetch('/api/wallet/balance', {
+    headers: {
+        'Authorization': `Bearer ${access_token}`
+    }
+});
+```
+
+### 2. Telegram InitData (Direct)
+
+```javascript
+fetch('/api/wallet/balance', {
+    headers: {
+        'X-Telegram-Init-Data': window.Telegram.WebApp.initData
+    }
+});
+```
+
+---
+
+## 💳 Wallet Operations
+
+### Create Deposit
+
+```javascript
+const response = await fetch('/api/wallet/deposit', {
+    method: 'POST',
+    headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        amount: 100.0,
+        currency: "USDT.TRC20"
+    })
+});
+
+const { payment_url, payment_address } = await response.json();
+// Redirect user to payment_url or show payment_address
+```
+
+### Create Withdrawal
+
+```javascript
+const response = await fetch('/api/wallet/withdraw', {
+    method: 'POST',
+    headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        amount: 50.0,
+        wallet_address: "TYourWalletAddress",
+        currency: "USDT.TRC20"
+    })
+});
+```
+
+---
+
+## 🏗️ Project Structure
+
+```
+golden-age-club/
+├── app/
+│   ├── core/
+│   │   ├── database.py          # MongoDB connection
+│   │   ├── init_db.py           # Database indexes
+│   │   └── logging_config.py    # Logging setup
+│   ├── middleware/
+│   │   ├── auth.py              # JWT & Telegram auth
+│   │   └── request_id.py        # Request ID tracking
+│   ├── models/
+│   │   ├── transaction.py       # Transaction model
+│   │   └── user.py              # User model
+│   ├── repositories/
+│   │   ├── transaction.py       # Transaction data access
+│   │   └── user.py              # User data access
+│   ├── routes/
+│   │   ├── auth.py              # Authentication endpoints
+│   │   ├── wallet.py            # Wallet endpoints
+│   │   └── webhook.py           # Webhook endpoints
+│   ├── schemas/
+│   │   ├── user.py              # User schemas
+│   │   └── wallet.py            # Wallet schemas
+│   ├── services/
+│   │   ├── ccpayment.py         # CCpayment integration
+│   │   └── wallet.py            # Wallet business logic
+│   ├── utils/
+│   │   └── telegram_auth.py     # Telegram validation
+│   ├── config.py                # Configuration
+│   ├── dependencies.py          # Dependency injection
+│   └── main.py                  # Application entry point
+├── test/
+│   ├── conftest.py              # Test fixtures
+│   ├── test_auth.py             # Auth tests
+│   ├── test_wallet.py           # Wallet tests
+│   └── test_webhook.py          # Webhook tests
+├── .env.example                 # Environment template
+├── requirements.txt             # Python dependencies
+├── DEPLOYMENT.md                # Deployment guide
+└── README.md                    # This file
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+pytest test/ -v
+
+# Run specific test file
+pytest test/test_auth.py -v
+
+# Run with coverage
+pytest test/ --cov=app --cov-report=html
+```
+
+---
+
+## 📊 Database Schema
+
+### Users Collection
+
+```javascript
+{
+  _id: 123456789,              // telegram_id
+  telegram_id: 123456789,
+  username: "johndoe",
+  first_name: "John",
+  last_name: "Doe",
+  balance: 1000.0,
+  is_active: true,
+  is_premium: false,
+  created_at: ISODate("2024-01-01T00:00:00Z"),
+  updated_at: ISODate("2024-01-01T00:00:00Z")
+}
+```
+
+### Transactions Collection
+
+```javascript
+{
+  _id: ObjectId("..."),
+  user_id: "123456789",
+  type: "deposit",              // or "withdrawal"
+  amount: 100.0,
+  currency: "USDT.TRC20",
+  status: "completed",          // pending, processing, completed, failed
+  merchant_order_id: "DEP-1234567890-123456789",
+  payment_url: "https://...",
+  payment_address: "TAddress...",
+  created_at: ISODate("..."),
+  updated_at: ISODate("..."),
+  completed_at: ISODate("...")
+}
+```
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+See `.env.example` for all configuration options:
+
+```env
+# Required
+TELEGRAM_BOT_TOKEN=your_bot_token
+CCPAYMENT_APP_ID=your_app_id
+CCPAYMENT_APP_SECRET=your_app_secret
+JWT_SECRET_KEY=your_secret_key
+
+# Optional
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=casino_db
+LOG_LEVEL=INFO
+LOG_FORMAT=console
+TESTING_MODE=false
+```
+
+---
+
+## 📖 Documentation
+
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment instructions
+- **[API Documentation](http://localhost:8000/docs)** - Interactive API docs (when running)
+- **[Codebase Review](docs/codebase_review.md)** - Comprehensive code analysis
+
+---
+
+## 🛡️ Security Features
+
+- ✅ HMAC-SHA256 signature verification (Telegram & CCpayment)
+- ✅ Data freshness checks (prevents replay attacks)
+- ✅ JWT token expiration
+- ✅ CORS restrictions
+- ✅ Rate limiting
+- ✅ Atomic balance operations (prevents race conditions)
+- ✅ Transaction ownership verification
+- ✅ Webhook signature validation
+
+---
+
+## 🚀 Production Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for detailed production deployment instructions.
+
+Quick checklist:
+- [ ] Set `TESTING_MODE=false`
+- [ ] Configure real credentials
+- [ ] Enable HTTPS
+- [ ] Set up MongoDB authentication
+- [ ] Configure logging (`LOG_FORMAT=json`)
+- [ ] Set up monitoring
+- [ ] Configure backups
+
+---
+
+## 📝 License
+
+Proprietary - All rights reserved
+
+---
+
+## 👥 Support
+
+For support and questions, contact the development team.
+
+---
+
+## 🎉 Acknowledgments
+
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
+- [Motor](https://motor.readthedocs.io/) - Async MongoDB driver
+- [python-jose](https://python-jose.readthedocs.io/) - JWT implementation
+- [CCpayment](https://ccpayment.com/) - Cryptocurrency payment processing
+
+---
+
+**Made with ❤️ for Golden Age Casino**

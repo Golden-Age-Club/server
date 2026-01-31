@@ -1,48 +1,39 @@
 from datetime import datetime
-from typing import Optional
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
+from pydantic import BaseModel, Field
 
 class TransactionType(str, Enum):
     DEPOSIT = "deposit"
     WITHDRAWAL = "withdrawal"
-    BET = "bet"
-    WIN = "win"
-    ADJUSTMENT = "adjustment"
-    BONUS = "bonus"
+    GAME_BET = "game_bet"
+    GAME_WIN = "game_win"
+    GAME_REFUND = "game_refund"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
+    PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
-    REVERSED = "reversed"
+    EXPIRED = "expired"
 
-class TransactionBase(BaseModel):
-    player_id: str
-    amount: float
+class Currency(str, Enum):
+    USDT_TRC20 = "USDT.TRC20"
+    USDT_ERC20 = "USDT.ERC20"
+    USDT_BEP20 = "USDT.BEP20"
+
+class Transaction(BaseModel):
+    user_id: str
     type: TransactionType
-    status: TransactionStatus = TransactionStatus.COMPLETED
-    remarks: Optional[str] = None
-    
-    model_config = ConfigDict(use_enum_values=True)
-
-class TransactionCreate(TransactionBase):
-    pass
-
-class TransactionInDB(TransactionBase):
-    transaction_id: str
-    amount_before: float
-    amount_after: float
+    amount: float
+    currency: str
+    status: TransactionStatus
+    merchant_order_id: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    created_by: Optional[str] = None # Admin ID if manual adjustment
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-
-class TransactionResponse(TransactionInDB):
-    pass
-
-class BalanceAdjustmentRequest(BaseModel):
-    player_id: str
-    amount: float # Positive for add, negative for subtract
-    type: TransactionType = TransactionType.ADJUSTMENT
-    remarks: str
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    payment_url: Optional[str] = None
+    payment_address: Optional[str] = None
+    wallet_address: Optional[str] = None
+    ccpayment_order_id: Optional[str] = None
+    error_message: Optional[str] = None

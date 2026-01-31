@@ -1,1 +1,1 @@
-"""Request/response middleware."""
+# Middleware package
