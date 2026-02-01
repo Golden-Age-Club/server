@@ -142,37 +142,43 @@ class PGProviderService {
   }
 
   async launchGame(gameId, playerId, playerToken, language = 'en', currency = 'USD', exitUrl, walletUrl) {
-    const requestTime = Date.now().toString();
-    const sign = this._createSign(requestTime);
+    const requestTime = Date.now(); // User sample uses number
+    const baseUrl = walletUrl ? new URL(walletUrl).origin : 'https://google.com';
 
-    // Params structure needs to match API expectations exactly
+    // Params structure matching the user's provided expected request
     const params = {
-        app_id: this.appId,
-        request_time: requestTime,
-        sign: sign,
-        game_id: gameId,
+        exit: exitUrl,
+        game_id: parseInt(gameId), // Ensure number if expected as number in sample (sample has 1203)
         player_id: playerId,
         player_token: playerToken,
-        currency: currency,
+        app_id: this.appId,
         language: language,
+        currency: currency,
+        request_time: requestTime,
         urls: {
-            exit: exitUrl,
-            deposit: walletUrl,
-            withdraw: walletUrl
+            base_url: baseUrl,
+            wallet_url: walletUrl,
+            other_url: `${baseUrl}/support` // Assuming support url
         }
     };
 
-    // The sign for launch might be different or use the generic one?
-    // Python code has `_create_play_sign` but uses it? 
-    // Let's assume standard sign for now unless we see `play` endpoint usage.
-    
-    // If it's a specific "play" or "launch" endpoint, check Python usage:
-    // It calls `self.client.post(url, json=params)`.
-    
+    // Signature generation matching the user's sample code
+    const createSign = (p, apiKey) => {
+        const values = Object.entries(p)
+            .filter(([key]) => key !== 'sign' && key !== 'urls')
+            .map(([, value]) => (value && typeof value === 'object' ? JSON.stringify(value) : value))
+            .join('');
+        const encoded = encodeURIComponent(values);
+        return crypto.createHmac('md5', apiKey).update(encoded).digest('hex');
+    };
+
+    params.sign = createSign(params, this.apiKey);
+
     // Use the resolver URL for launching games
     const launchBaseUrl = 'https://resolver.mgcapi.com';
     
     console.log(`[PGProvider] Launching game ${gameId} for user ${playerId}`);
+    console.log('[PGProvider] Launch params:', JSON.stringify(params, null, 2)); // Log params for debugging
     
     try {
       const response = await axios.post(`${launchBaseUrl}/api/v1/launch-game`, params);
