@@ -153,6 +153,11 @@ exports.unifiedCallback = async (req, res) => {
     if (cmd === 'withdraw') { // Game Bet
       const existingTx = await Transaction.findOne({ merchant_order_id: transactionId });
       if (existingTx) {
+        // Update existing transaction
+        existingTx.updated_at = new Date();
+        if (betInfo) existingTx.bet_info = betInfo;
+        await existingTx.save();
+
         return res.json({
           result: true,
           err_desc: 'OK',
@@ -208,6 +213,11 @@ exports.unifiedCallback = async (req, res) => {
     } else if (cmd === 'deposit') { // Game Win
       const existingTx = await Transaction.findOne({ merchant_order_id: transactionId });
       if (existingTx) {
+        // Update existing transaction
+        existingTx.updated_at = new Date();
+        if (betInfo) existingTx.bet_info = betInfo;
+        await existingTx.save();
+
         return res.json({
           result: true,
           err_desc: 'OK',
@@ -258,12 +268,8 @@ exports.unifiedCallback = async (req, res) => {
         });
       }
 
-      const existingRollback = await Transaction.findOne({
-        merchant_order_id: transactionId,
-        type: 'game_refund'
-      });
-
-      if (existingRollback) {
+      // Check if already refunded
+      if (originalTx.status === 'refunded') {
         return res.json({
           result: true,
           err_desc: 'OK',
@@ -306,17 +312,11 @@ exports.unifiedCallback = async (req, res) => {
         });
       }
 
-      await Transaction.create({
-        user_id: userIdStr,
-        type: 'game_refund',
-        amount: txAmount,
-        currency: currencyId || 'USD',
-        status: 'completed',
-        merchant_order_id: transactionId,
-        game_id: gameId,
-        round_id: roundId,
-        bet_info: betInfo
-      });
+      // Update original transaction instead of creating new one
+      originalTx.status = 'refunded';
+      originalTx.updated_at = new Date();
+      if (betInfo) originalTx.bet_info = betInfo;
+      await originalTx.save();
 
       return res.json({
         result: true,
