@@ -13,7 +13,8 @@ const TransactionStatus = {
   PROCESSING: 'processing',
   COMPLETED: 'completed',
   FAILED: 'failed',
-  EXPIRED: 'expired'
+  EXPIRED: 'expired',
+  REFUNDED: 'refunded'
 };
 
 const Currency = {
