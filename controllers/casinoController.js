@@ -69,6 +69,8 @@ const playGame = async (req, res) => {
     const { game_id, exit_url } = req.body;
     const user = req.user; // From auth middleware
 
+    console.log(`[CasinoController] Play game request - User: ${user._id}, Game: ${game_id}`);
+
     if (!game_id) {
       return res.status(400).json({ message: "game_id is required" });
     }
@@ -93,7 +95,7 @@ const playGame = async (req, res) => {
     // API_HOST/PORT might be internal, use ALLOWED_ORIGINS[0] or explicit PUBLIC_URL
     const publicUrl = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',')[0] : 'http://localhost:5173';
     const walletUrl = `${publicUrl}/wallet`; // Frontend wallet page
-    const actualExitUrl = exitUrl || `${publicUrl}/`;
+    const actualExitUrl = exit_url || `${publicUrl}/`;
 
     const data = await pgProviderService.launchGame(
       game_id,
@@ -108,8 +110,14 @@ const playGame = async (req, res) => {
     res.json(data);
 
   } catch (error) {
-    console.error("Error launching game", error);
-    res.status(502).json({ message: "Failed to launch game" });
+    console.error("Error launching game:", error.message);
+    if (error.response) {
+       console.error("Provider error details:", JSON.stringify(error.response.data, null, 2));
+    }
+    res.status(502).json({ 
+      message: "Failed to launch game",
+      details: error.message 
+    });
   }
 };
 

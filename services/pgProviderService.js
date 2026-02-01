@@ -169,8 +169,23 @@ class PGProviderService {
     // If it's a specific "play" or "launch" endpoint, check Python usage:
     // It calls `self.client.post(url, json=params)`.
     
-    const response = await axios.post(`${this.baseUrl}/api/v1/launch-game`, params);
-    return response.data;
+    // Use the resolver URL for launching games
+    const launchBaseUrl = 'https://resolver.mgcapi.com';
+    
+    console.log(`[PGProvider] Launching game ${gameId} for user ${playerId}`);
+    
+    try {
+      const response = await axios.post(`${launchBaseUrl}/api/v1/launch-game`, params);
+      console.log('[PGProvider] Launch game response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[PGProvider] Launch game error:', error.message);
+      if (error.response) {
+        console.error('[PGProvider] Error response status:', error.response.status);
+        console.error('[PGProvider] Error response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      throw error;
+    }
   }
 }
 
