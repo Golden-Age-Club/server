@@ -30,13 +30,13 @@ class CCPaymentService {
       // Let's implement the one from the Python code exactly
       const sortedParams = Object.keys(data).sort();
       const signStrArr = [];
-      
+
       for (const key of sortedParams) {
         if (data[key] !== null && data[key] !== undefined) {
           signStrArr.push(`${key}=${data[key]}`);
         }
       }
-      
+
       let signStr = signStrArr.join('&');
       signStr = `${signStr}&timestamp=${timestamp}`;
 
@@ -45,7 +45,14 @@ class CCPaymentService {
         .update(signStr)
         .digest('hex');
 
-      return sign === expectedSignature;
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      const receivedBuffer = Buffer.from(sign, 'utf8');
+
+      if (expectedBuffer.length !== receivedBuffer.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
     } catch (error) {
       console.error('Signature verification error:', error);
       return false;
@@ -58,7 +65,7 @@ class CCPaymentService {
   async createPaymentOrder({ orderId, amount, currency, productName = "Casino Deposit", notifyUrl, returnUrl }) {
     try {
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      
+
       // V2 Payload
       const payload = {
         orderId: orderId,

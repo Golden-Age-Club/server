@@ -30,42 +30,74 @@ exports.ccPaymentWebhook = async (req, res) => {
     // Handle Deposit
     if (transaction.type === 'deposit') {
       if (order_status === 'paid' || order_status === 'confirmed') {
-        if (transaction.status !== 'completed') {
-            console.log(`Processing deposit confirmation: user=${transaction.user_id}, amount=${transaction.amount}`);
-            
-            // Update User Balance
-            await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
-            
-            // Update Transaction
-            transaction.status = 'completed';
-            transaction.completed_at = new Date();
-            transaction.webhook_data = body;
-            await transaction.save();
-            
-            console.log(`✅ Deposit completed: transaction_id=${transaction._id}`);
+        // Atomic update to ensure idempotency
+        // Only update if status is NOT 'completed'
+        const updatedTx = await Transaction.findOneAndUpdate(
+          { _id: transaction._id, status: { $ne: 'completed' } },
+          {
+            $set: {
+              status: 'completed',
+              completed_at: new Date(),
+              webhook_data: body
+            }
+          },
+          { new: true }
+        );
+
+        if (updatedTx) {
+          console.log(`Processing deposit confirmation: user=${transaction.user_id}, amount=${transaction.amount}`);
+
+          // Only credit balance if transaction update succeeded
+          await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
+
+          console.log(`✅ Deposit completed: transaction_id=${transaction._id}`);
+        } else {
+          console.log(`⚠️ Deposit already processed (duplicate webhook): transaction_id=${transaction._id}`);
         }
       } else if (order_status === 'expired' || order_status === 'failed') {
-        transaction.status = 'failed';
-        transaction.webhook_data = body;
-        await transaction.save();
+        await Transaction.updateOne({ _id: transaction._id }, { status: 'failed', webhook_data: body });
       }
     }
     // Handle Withdrawal
     else if (transaction.type === 'withdrawal') {
       if (order_status === 'success' || order_status === 'completed') {
-        transaction.status = 'completed';
-        transaction.completed_at = new Date();
-        transaction.webhook_data = body;
-        await transaction.save();
-        console.log(`✅ Withdrawal completed: transaction_id=${transaction._id}`);
+        // Atomic update
+        const updatedTx = await Transaction.findOneAndUpdate(
+          { _id: transaction._id, status: { $ne: 'completed' } },
+          {
+            $set: {
+              status: 'completed',
+              completed_at: new Date(),
+              webhook_data: body
+            }
+          }
+        );
+
+        if (updatedTx) {
+          console.log(`✅ Withdrawal completed: transaction_id=${transaction._id}`);
+        }
+
       } else if (order_status === 'failed') {
-        // Refund balance
-        console.warn(`⚠️ Withdrawal failed, refunding: user=${transaction.user_id}, amount=${transaction.amount}`);
-        await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
-        
-        transaction.status = 'failed';
-        transaction.webhook_data = body;
-        await transaction.save();
+        // Refund balance ONLY if we are the ones properly marking it as failed
+        // Prevents double-refund on duplicate 'failed' webhooks
+        const updatedTx = await Transaction.findOneAndUpdate(
+          { _id: transaction._id, status: { $nin: ['failed', 'completed'] } }, // Ensure not already processed
+          {
+            $set: {
+              status: 'failed',
+              webhook_data: body
+            }
+          },
+          { new: true }
+        );
+
+        if (updatedTx) {
+          // Refund balance
+          console.warn(`⚠️ Withdrawal failed, refunding: user=${transaction.user_id}, amount=${transaction.amount}`);
+          await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
+        } else {
+          console.warn(`⚠️ Withdrawal failed webhook received but transaction already final: ${transaction._id}`);
+        }
       }
     }
 
@@ -98,7 +130,7 @@ exports.unifiedCallback = async (req, res) => {
 
     // 1. Decode Player Token
     let userId = null;
-    
+
     // Try JWT
     try {
       const decoded = jwt.verify(player_token, process.env.JWT_SECRET_KEY);
@@ -135,8 +167,8 @@ exports.unifiedCallback = async (req, res) => {
     // 2. Get User
     let user = await User.findById(userId);
     if (!user && !isNaN(userId)) {
-       // Fallback for numeric ID (Telegram ID)
-       user = await User.findOne({ telegram_id: userId });
+      // Fallback for numeric ID (Telegram ID)
+      user = await User.findOne({ telegram_id: userId });
     }
 
     if (!user) {
@@ -293,22 +325,22 @@ exports.unifiedCallback = async (req, res) => {
         // Reverse win -> Deduct money
         newBalance = beforeBalance - txAmount;
         if (newBalance < 0) {
-             return res.json({
-                result: true,
-                err_desc: 'Insufficient balance for rollback',
-                err_code: 4,
-                balance: beforeBalance,
-                before_balance: beforeBalance,
-                transactionId
-            });
+          return res.json({
+            result: true,
+            err_desc: 'Insufficient balance for rollback',
+            err_code: 4,
+            balance: beforeBalance,
+            before_balance: beforeBalance,
+            transactionId
+          });
         }
         user.balance = newBalance;
         await user.save();
       } else {
         return res.json({
-            result: true,
-            err_desc: 'Invalid transaction type for rollback',
-            err_code: 5
+          result: true,
+          err_desc: 'Invalid transaction type for rollback',
+          err_code: 5
         });
       }
 
