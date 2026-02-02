@@ -18,7 +18,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -45,6 +46,8 @@ const walletRoutes = require('./routes/walletRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const supportRoutes = require('./routes/supportRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const AdminController = require('./controllers/adminController');
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -53,6 +56,7 @@ app.use('/api/casino', casinoRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', webhookRoutes);
 
 app.get('/', (req, res) => {
@@ -75,6 +79,10 @@ app.get('/health', (req, res) => {
 // Start Server
 const startServer = async () => {
   await connectDB();
+  
+  // Seed Super Admin
+  await AdminController.seedSuperAdmin();
+
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
