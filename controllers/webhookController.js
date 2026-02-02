@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { Transaction } = require('../models/Transaction');
 const User = require('../models/User');
 const ccPaymentService = require('../services/ccPaymentService');
+const RiskEngine = require('../services/RiskEngine');
 
 // CCPayment Webhook
 exports.ccPaymentWebhook = async (req, res) => {
@@ -34,7 +35,7 @@ exports.ccPaymentWebhook = async (req, res) => {
             console.log(`Processing deposit confirmation: user=${transaction.user_id}, amount=${transaction.amount}`);
             
             // Update User Balance
-            await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
+            const user = await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } }, { new: true });
             
             // Update Transaction
             transaction.status = 'completed';
@@ -42,6 +43,11 @@ exports.ccPaymentWebhook = async (req, res) => {
             transaction.webhook_data = body;
             await transaction.save();
             
+            // Check Deposit Risk
+            if (user) {
+              await RiskEngine.checkDepositRisk(user, transaction);
+            }
+
             console.log(`✅ Deposit completed: transaction_id=${transaction._id}`);
         }
       } else if (order_status === 'expired' || order_status === 'failed') {
@@ -198,8 +204,12 @@ exports.unifiedCallback = async (req, res) => {
         merchant_order_id: transactionId,
         game_id: gameId,
         round_id: roundId,
-        bet_info: betInfo
+        bet_info: betInfo,
+        balance_after: newBalance
       });
+
+      // Check Gameplay Risk
+      await RiskEngine.checkGameplayRisk(user);
 
       return res.json({
         result: true,
@@ -246,8 +256,12 @@ exports.unifiedCallback = async (req, res) => {
         merchant_order_id: transactionId,
         game_id: gameId,
         round_id: roundId,
-        bet_info: betInfo
+        bet_info: betInfo,
+        balance_after: newBalance
       });
+
+      // Check Gameplay Risk
+      await RiskEngine.checkGameplayRisk(user);
 
       return res.json({
         result: true,

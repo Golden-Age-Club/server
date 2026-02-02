@@ -22,6 +22,11 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
+      // Check if user is frozen or inactive
+      if (req.user.is_frozen || !req.user.is_active) {
+         return res.status(403).json({ message: 'Account is frozen or inactive. Please contact support.' });
+      }
+
       next();
     } catch (error) {
       console.error(error);

@@ -56,6 +56,11 @@ const createWithdrawal = async (req, res) => {
     const { amount, wallet_address, currency = 'USDT' } = req.body;
     const user = req.user;
 
+    // Check for risk status
+    if (user.risk_level === 'high') {
+      return res.status(403).json({ message: "Withdrawal restricted due to security alert. Please contact support." });
+    }
+
     // Validate amount
     if (amount < MIN_WITHDRAWAL_AMOUNT) {
       return res.status(400).json({ message: `Minimum withdrawal amount is ${MIN_WITHDRAWAL_AMOUNT} USDT` });

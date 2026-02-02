@@ -60,6 +60,33 @@ const userSchema = new mongoose.Schema({
   best_win: {
     type: Number,
     default: 0.0
+  },
+  vip_level: {
+    type: Number,
+    default: 0
+  },
+  risk_level: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'low'
+  },
+  is_frozen: {
+    type: Boolean,
+    default: false
+  },
+  failed_login_attempts: {
+    type: Number,
+    default: 0
+  },
+  last_failed_login: {
+    type: Date
+  },
+  last_deposit_at: {
+    type: Date
+  },
+  deposit_count_24h: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } // Map to snake_case to match Python

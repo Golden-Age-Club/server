@@ -5,7 +5,8 @@ const TransactionType = {
   WITHDRAWAL: 'withdrawal',
   GAME_BET: 'game_bet',
   GAME_WIN: 'game_win',
-  GAME_REFUND: 'game_refund'
+  GAME_REFUND: 'game_refund',
+  ADJUSTMENT: 'adjustment'
 };
 
 const TransactionStatus = {
@@ -70,6 +71,21 @@ const transactionSchema = new mongoose.Schema({
   },
   error_message: {
     type: String
+  },
+  game_id: {
+    type: String
+  },
+  round_id: {
+    type: String
+  },
+  bet_info: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  webhook_data: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  balance_after: {
+    type: Number
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

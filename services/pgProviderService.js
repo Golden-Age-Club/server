@@ -1,8 +1,14 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const GameSetting = require('../models/GameSetting');
+const { Transaction } = require('../models/Transaction');
 
 let gamesCache = {
   data: [],
+  timestamp: 0
+};
+let optionsCache = {
+  data: null,
   timestamp: 0
 };
 const CACHE_DURATION = 600 * 1000; // 600 seconds in ms
@@ -20,56 +26,20 @@ class PGProviderService {
 
   _createSign(requestTime) {
     const raw = `${this.appId}${requestTime}`;
-    const encoded = encodeURIComponent(raw).replace(/[!'()*]/g, escape); // Python quote(safe="") equivalent-ish
-    // Actually encodeURIComponent is slightly different from python quote in some chars, 
-    // but for alphanumeric it's fine. Python quote with safe="" encodes everything except alphanumeric.
-    // For strictly matching Python's urllib.parse.quote(raw, safe=""), we might need a custom function 
-    // if raw contains special chars. But appId and requestTime are usually alphanumeric.
+    // Using encodeURIComponent then replacing strictly to match python quote(safe="")
+    const encoded = encodeURIComponent(raw).replace(/[!'()*]/g, escape);
     
     return crypto
       .createHmac('md5', this.apiKey)
-      .update(raw) // Python uses encoded, but let's check if raw needs encoding. Python: quote(raw).
-                   // If app_id and time are safe chars, quote does nothing.
-                   // Let's assume they are safe.
-      .digest('hex');
-  }
-
-  _createPlaySign(params) {
-    // Values except sign and urls, joined, encoded, HMAC-MD5
-    // Python: values = [serialize(params[key]) for key in params if key not in ('sign', 'urls')]
-    // Python keys iteration order is insertion order (usually). 
-    // IMPORTANT: Python code assumes keys are iterated in a specific order? 
-    // Or just all keys present in the dict?
-    // Looking at Python code: `for key in params`. 
-    // We must ensure we pass params in the correct order or the API expects arbitrary order?
-    // Usually APIs expect sorted keys or specific order.
-    // Python dicts preserve insertion order since 3.7.
-    
-    // Let's rely on the caller passing keys in the right order or the API not caring about order 
-    // (unlikely if we just join values).
-    // The Python code just iterates `params`.
-    
-    const values = [];
-    for (const key in params) {
-      if (key !== 'sign' && key !== 'urls') {
-        let value = params[key];
-        if (typeof value === 'object') {
-          value = JSON.stringify(value).replace(/ /g, ''); // Simple minification
-        }
-        values.push(String(value));
-      }
-    }
-    
-    const concatenated = values.join('');
-    const encoded = encodeURIComponent(concatenated).replace(/[!'()*]/g, escape); // safe=''
-    
-    return crypto
-      .createHmac('md5', this.apiKey)
-      .update(encoded)
+      .update(raw)
       .digest('hex');
   }
 
   async getOptions() {
+    if (Date.now() - optionsCache.timestamp < CACHE_DURATION && optionsCache.data) {
+        return optionsCache.data;
+    }
+
     const requestTime = Date.now().toString();
     const sign = this._createSign(requestTime);
 
@@ -80,31 +50,18 @@ class PGProviderService {
     };
 
     const response = await axios.get(`${this.baseUrl}/api/v1/get-options`, { params });
+    if (response.data) {
+        optionsCache.data = response.data;
+        optionsCache.timestamp = Date.now();
+    }
     return response.data;
   }
 
-  async getGames(page = 1, limit = 20, providerId = null, search = null, offset = null) {
-    // Check cache
-    if (Date.now() - gamesCache.timestamp < CACHE_DURATION && gamesCache.data.length > 0) {
-        // Filter cache if needed
-        let result = gamesCache.data;
-        if (providerId) result = result.filter(g => String(g.provider_id) === String(providerId));
-        if (search) result = result.filter(g => (g.name || g.title || '').toLowerCase().includes(search.toLowerCase()));
-        
-        // Pagination
-        const start = offset !== null ? parseInt(offset) : (page - 1) * limit;
-        const end = start + limit;
-        const total = result.length;
-        const totalPages = Math.ceil(total / limit);
-        
-        return {
-            games: result.slice(start, end),
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: total,
-            total_pages: totalPages
-        };
-    }
+  async _fetchGamesFromProvider() {
+     // Check cache first
+     if (Date.now() - gamesCache.timestamp < CACHE_DURATION && gamesCache.data.length > 0) {
+         return gamesCache.data;
+     }
 
     const requestTime = Date.now().toString();
     const sign = this._createSign(requestTime);
@@ -117,13 +74,44 @@ class PGProviderService {
 
     const response = await axios.get(`${this.baseUrl}/api/v1/get-games`, { params });
     
-    // The provider returns { games: [...] } structure
     if (response.data && Array.isArray(response.data.games)) {
         gamesCache.data = response.data.games;
         gamesCache.timestamp = Date.now();
+        return gamesCache.data;
     }
+    return [];
+  }
+
+  async getGames(page = 1, limit = 20, providerId = null, search = null, offset = null) {
+    let result = await this._fetchGamesFromProvider();
     
-    let result = gamesCache.data;
+    // 1. Filter by Active Providers
+    // Get active providers from options
+    try {
+        const options = await this.getOptions();
+        if (options && options.providers) {
+            const activeProviderIds = options.providers
+                .filter(p => p.is_active === 1 || p.is_active === true) // Assuming 1/true is active
+                .map(p => String(p.id));
+            
+            // Filter games whose provider is active
+            result = result.filter(g => activeProviderIds.includes(String(g.provider_id)));
+        }
+    } catch (e) {
+        console.warn("Failed to filter by provider status", e);
+    }
+
+    // 2. Filter by Local Game Settings (Disabled games)
+    try {
+        const disabledGames = await GameSetting.find({ status: 'disabled' }).distinct('game_id');
+        if (disabledGames.length > 0) {
+            result = result.filter(g => !disabledGames.includes(String(g.game_id)));
+        }
+    } catch (e) {
+        console.warn("Failed to filter by local game settings", e);
+    }
+
+    // 3. Standard Filtering
     if (providerId) result = result.filter(g => String(g.provider_id) === String(providerId));
     if (search) result = result.filter(g => (g.name || g.title || '').toLowerCase().includes(search.toLowerCase()));
     
@@ -141,14 +129,104 @@ class PGProviderService {
     };
   }
 
+  // Admin Method: Get all games with stats and provider status
+  async getGamesWithStats(page = 1, limit = 20, search = null) {
+    let games = await this._fetchGamesFromProvider();
+    
+    // Get Providers to map status
+    const options = await this.getOptions();
+    const providerStatusMap = {};
+    if (options && options.providers) {
+        options.providers.forEach(p => {
+            providerStatusMap[p.id] = p.is_active;
+        });
+    }
+
+    // Get Local Settings
+    const localSettings = await GameSetting.find({});
+    const localStatusMap = {};
+    localSettings.forEach(s => {
+        localStatusMap[s.game_id] = s.status;
+    });
+
+    // Get Stats (Aggregated)
+    const stats = await Transaction.aggregate([
+        { 
+            $match: { 
+                type: { $in: ['game_bet', 'game_win'] } 
+            } 
+        },
+        { 
+            $group: {
+                _id: '$game_id',
+                totalBets: {
+                    $sum: {
+                        $cond: [{ $eq: ["$type", "game_bet"] }, "$amount", 0]
+                    }
+                },
+                totalWins: {
+                    $sum: {
+                        $cond: [{ $eq: ["$type", "game_win"] }, "$amount", 0]
+                    }
+                },
+                betCount: {
+                    $sum: {
+                        $cond: [{ $eq: ["$type", "game_bet"] }, 1, 0]
+                    }
+                }
+            }
+        }
+    ]);
+    
+    const statsMap = {};
+    stats.forEach(s => {
+        statsMap[s._id] = s;
+    });
+
+    // Merge Data
+    let result = games.map(g => {
+        const pStatus = providerStatusMap[g.provider_id];
+        const lStatus = localStatusMap[g.game_id] || 'enabled';
+        const gStats = statsMap[g.game_id] || { totalBets: 0, betCount: 0, totalWins: 0 };
+        const rtp = gStats.totalBets > 0 ? (gStats.totalWins / gStats.totalBets) * 100 : 0;
+
+        return {
+            ...g,
+            provider_status: pStatus, // 1 or 0
+            local_status: lStatus,
+            stats: {
+                total_bets: gStats.totalBets,
+                bet_count: gStats.betCount,
+                total_wins: gStats.totalWins,
+                rtp: parseFloat(rtp.toFixed(2))
+            }
+        };
+    });
+
+    if (search) result = result.filter(g => (g.name || g.title || '').toLowerCase().includes(search.toLowerCase()));
+
+    // Pagination
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const total = result.length;
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        games: result.slice(start, end),
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: total,
+        total_pages: totalPages
+    };
+  }
+
   async launchGame(gameId, playerId, playerToken, language = 'en', currency = 'USD', exitUrl, walletUrl) {
-    const requestTime = Date.now(); // User sample uses number
+    const requestTime = Date.now(); 
     const baseUrl = walletUrl ? new URL(walletUrl).origin : 'https://google.com';
 
-    // Params structure matching the user's provided expected request
     const params = {
         exit: exitUrl,
-        game_id: parseInt(gameId), // Ensure number if expected as number in sample (sample has 1203)
+        game_id: parseInt(gameId), 
         player_id: playerId,
         player_token: playerToken,
         app_id: this.appId,
@@ -158,11 +236,10 @@ class PGProviderService {
         urls: {
             base_url: baseUrl,
             wallet_url: walletUrl,
-            other_url: `${baseUrl}/support` // Assuming support url
+            other_url: `${baseUrl}/support` 
         }
     };
 
-    // Signature generation matching the user's sample code
     const createSign = (p, apiKey) => {
         const values = Object.entries(p)
             .filter(([key]) => key !== 'sign' && key !== 'urls')
@@ -174,20 +251,16 @@ class PGProviderService {
 
     params.sign = createSign(params, this.apiKey);
 
-    // Use the resolver URL for launching games
     const launchBaseUrl = 'https://resolver.mgcapi.com';
     
     console.log(`[PGProvider] Launching game ${gameId} for user ${playerId}`);
-    console.log('[PGProvider] Launch params:', JSON.stringify(params, null, 2)); // Log params for debugging
     
     try {
       const response = await axios.post(`${launchBaseUrl}/api/v1/launch-game`, params);
-      console.log('[PGProvider] Launch game response:', response.data);
       return response.data;
     } catch (error) {
       console.error('[PGProvider] Launch game error:', error.message);
       if (error.response) {
-        console.error('[PGProvider] Error response status:', error.response.status);
         console.error('[PGProvider] Error response data:', JSON.stringify(error.response.data, null, 2));
       }
       throw error;

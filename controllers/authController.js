@@ -147,6 +147,8 @@ const registerEmail = async (req, res) => {
   }
 };
 
+const RiskEngine = require('../services/RiskEngine');
+
 // @desc    Login user with Email/Password
 // @route   POST /api/auth/login/email
 // @access  Public
@@ -162,6 +164,9 @@ const loginEmail = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password_hash))) {
+      // Reset risk counter on success
+      await RiskEngine.resetLoginFailure(user);
+
       res.json({
         access_token: generateToken(user._id, null),
         token_type: "bearer",
@@ -175,6 +180,10 @@ const loginEmail = async (req, res) => {
         }
       });
     } else {
+      // Log risk failure if user exists but password wrong
+      if (user) {
+        await RiskEngine.recordLoginFailure(user);
+      }
       res.status(400).json({ message: 'Invalid credentials' });
     }
   } catch (error) {

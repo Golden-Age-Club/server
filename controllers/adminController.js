@@ -1,5 +1,7 @@
 const Admin = require('../models/Admin');
+const User = require('../models/User');
 const { Transaction } = require('../models/Transaction');
+const VipTier = require('../models/VipTier');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -456,6 +458,350 @@ class AdminController {
       res.status(500).json({ message: 'Failed to fetch chart statistics' });
     }
   }
+
+  /**
+   * Get User Statistics (Total, Active, VIP, Frozen)
+   * @route GET /api/admin/users/stats
+   */
+  static async getUserStats(req, res) {
+    try {
+      const total = await User.countDocuments();
+      const active = await User.countDocuments({ is_active: true });
+      const vip = await User.countDocuments({ vip_level: { $gt: 0 } });
+      const frozen = await User.countDocuments({ is_frozen: true });
+
+      res.json({
+        total,
+        active,
+        vip,
+        frozen
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      res.status(500).json({ message: 'Failed to fetch user stats' });
+    }
+  }
+
+  /**
+   * Get Users List with Pagination, Search, and Filters
+   * @route GET /api/admin/users
+   */
+  static async getUsers(req, res) {
+    try {
+      const { page = 1, limit = 10, search = '', role, status } = req.query;
+      const skip = (page - 1) * limit;
+
+      let query = {};
+
+      if (search) {
+        query.$or = [
+          { username: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { first_name: { $regex: search, $options: 'i' } },
+          { last_name: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      if (role) {
+        // Assuming role logic if implemented in future, current User model doesn't have role
+      }
+
+      if (status) {
+        if (status === 'active') query.is_active = true;
+        if (status === 'frozen') query.is_frozen = true;
+        // If conflict between is_active and is_frozen, handle accordingly
+        // Usually is_frozen = true implies is_active = false or blocked
+      }
+
+      const users = await User.find(query)
+        .select('-password_hash')
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      const total = await User.countDocuments(query);
+
+      res.json({
+        users,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
+      });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  }
+
+  /**
+   * Create New User
+   * @route POST /api/admin/users
+   */
+  static async createUser(req, res) {
+    try {
+      const { username, email, password, first_name, last_name, vip_level, risk_level, balance } = req.body;
+
+      const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User with this email or username already exists' });
+      }
+
+      let password_hash = null;
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        password_hash = await bcrypt.hash(password, salt);
+      }
+
+      const newUser = await User.create({
+        username,
+        email,
+        password_hash,
+        first_name,
+        last_name,
+        vip_level: vip_level || 0,
+        risk_level: risk_level || 'low',
+        balance: balance || 0,
+        is_active: true,
+        is_frozen: false
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({ message: 'Failed to create user' });
+    }
+  }
+
+  /**
+   * Get User Details
+   * @route GET /api/admin/users/:id
+   */
+  static async getUser(req, res) {
+    try {
+      const user = await User.findById(req.params.id).select('-password_hash');
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      res.status(500).json({ message: 'Failed to fetch user' });
+    }
+  }
+
+  /**
+   * Update User
+   * @route PUT /api/admin/users/:id
+   */
+  static async updateUser(req, res) {
+    try {
+      const { first_name, last_name, email, vip_level, risk_level, is_active, is_frozen, balance } = req.body;
+      
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (first_name) user.first_name = first_name;
+      if (last_name) user.last_name = last_name;
+      if (email) user.email = email;
+      if (vip_level !== undefined) user.vip_level = vip_level;
+      if (risk_level) user.risk_level = risk_level;
+      if (is_active !== undefined) user.is_active = is_active;
+      if (is_frozen !== undefined) user.is_frozen = is_frozen;
+      if (balance !== undefined) user.balance = balance;
+
+      await user.save();
+      res.json(user);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({ message: 'Failed to update user' });
+    }
+  }
+
+  /**
+   * Delete User
+   * @route DELETE /api/admin/users/:id
+   */
+  static async deleteUser(req, res) {
+    try {
+      const user = await User.findByIdAndDelete(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
+    }
+  }
+
+  // --- VIP Management ---
+
+  /**
+   * Get VIP Tiers
+   * @route GET /api/admin/vip/tiers
+   */
+  static async getVipTiers(req, res) {
+    try {
+      let tiers = await VipTier.find().sort({ level: 1 });
+      
+      // Seed default tiers if empty
+      if (tiers.length === 0) {
+        const defaultTiers = [
+          { level: 1, name: "Bronze", min_deposit: 0, min_bets: 0, benefits: "Basic support, 1% cashback", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+          { level: 2, name: "Silver", min_deposit: 1000, min_bets: 5000, benefits: "Priority support, 2% cashback, weekly bonus", color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200" },
+          { level: 3, name: "Gold", min_deposit: 5000, min_bets: 20000, benefits: "VIP support, 3% cashback, daily bonus, exclusive games", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+          { level: 4, name: "Platinum", min_deposit: 25000, min_bets: 100000, benefits: "Dedicated manager, 5% cashback, custom bonuses", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
+          { level: 5, name: "Diamond", min_deposit: 100000, min_bets: 500000, benefits: "Personal account manager, 7% cashback, exclusive events", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" }
+        ];
+        await VipTier.insertMany(defaultTiers);
+        tiers = await VipTier.find().sort({ level: 1 });
+      }
+
+      res.json(tiers);
+    } catch (error) {
+      console.error('Error fetching VIP tiers:', error);
+      res.status(500).json({ message: 'Failed to fetch VIP tiers' });
+    }
+  }
+
+  /**
+   * Update VIP Tier
+   * @route POST /api/admin/vip/tiers
+   */
+  static async updateVipTier(req, res) {
+    try {
+      const { level, name, min_deposit, min_bets, benefits, color } = req.body;
+      
+      const tier = await VipTier.findOneAndUpdate(
+        { level },
+        { name, min_deposit, min_bets, benefits, color },
+        { upsert: true, new: true }
+      );
+      
+      res.json(tier);
+    } catch (error) {
+      console.error('Error updating VIP tier:', error);
+      res.status(500).json({ message: 'Failed to update VIP tier' });
+    }
+  }
+
+  /**
+   * Get High Value Users (VIP)
+   * @route GET /api/admin/vip/users
+   */
+  static async getVipUsers(req, res) {
+    try {
+      const { search = '' } = req.query;
+      let query = {};
+
+      if (search) {
+        query.$or = [
+          { username: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      // Users with high bets or explicitly VIP
+      // We can define "High Value" as total_bet > 1000 OR vip_level > 0
+      query.$or = [
+          ...(query.$or || []), 
+          { total_bet: { $gt: 1000 } },
+          { vip_level: { $gt: 0 } }
+      ];
+
+      // If search is present, we need to combine it carefully.
+      // Actually, standard logic: (search) AND (high value)
+      if (search) {
+          query = {
+              $and: [
+                  { $or: [{ username: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] },
+                  { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] }
+              ]
+          };
+      } else {
+          query = { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] };
+      }
+
+      const users = await User.find(query)
+        .select('username email vip_level total_bet total_won balance created_at last_login')
+        .sort({ total_bet: -1 })
+        .limit(50);
+
+      // Fetch tiers to map level to name
+      const tiers = await VipTier.find().lean();
+      const tierMap = tiers.reduce((acc, tier) => ({ ...acc, [tier.level]: tier.name }), {});
+
+      const formattedUsers = users.map(user => ({
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        currentVip: tierMap[user.vip_level] || `Level ${user.vip_level}`,
+        vipLevel: user.vip_level,
+        totalDeposit: 0, // Need transaction aggregation for this, or store in User model. For now, 0 or simple mock.
+        // Actually, let's just use balance or total_bet
+        totalBets: user.total_bet,
+        lastActivity: user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A',
+        status: user.is_active ? 'active' : 'inactive'
+      }));
+
+      res.json(formattedUsers);
+    } catch (error) {
+      console.error('Error fetching VIP users:', error);
+      res.status(500).json({ message: 'Failed to fetch VIP users' });
+    }
+  }
+
+  /**
+   * Export Data (CSV)
+   * @route GET /api/admin/export
+   */
+  static async exportData(req, res) {
+    try {
+      const { range = 'month' } = req.query;
+      const now = new Date();
+      let startDate = new Date();
+
+      if (range === 'week') {
+        startDate.setDate(now.getDate() - 7);
+      } else if (range === 'month') {
+        startDate.setDate(now.getDate() - 30);
+      } else if (range === 'year') {
+        startDate.setFullYear(now.getFullYear() - 1);
+      }
+
+      const transactions = await Transaction.find({
+        created_at: { $gte: startDate }
+      })
+      .populate('user_id', 'username email')
+      .sort({ created_at: -1 });
+
+      // CSV Header
+      let csv = 'Date,Transaction ID,User,Type,Amount,Status,Description\n';
+
+      // CSV Rows
+      transactions.forEach(tx => {
+        const date = tx.created_at.toISOString().split('T')[0];
+        const user = tx.user_id ? tx.user_id.username : 'Unknown';
+        const type = tx.type;
+        const amount = tx.amount;
+        const status = tx.status;
+        const description = (tx.description || '').replace(/,/g, ' '); // Escape commas
+
+        csv += `${date},${tx._id},${user},${type},${amount},${status},${description}\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=report-${range}-${Date.now()}.csv`);
+      res.status(200).send(csv);
+
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      res.status(500).json({ message: 'Failed to export data' });
+    }
+  }
+
 }
 
 module.exports = AdminController;

@@ -39,4 +39,28 @@ const protectAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { protectAdmin };
+const checkPermission = (requiredPermission) => {
+  return (req, res, next) => {
+    // Ensure admin is attached (should be used after protectAdmin)
+    if (!req.admin) {
+      return res.status(401).json({ message: 'Not authorized, user not found' });
+    }
+
+    // Super admin has all permissions
+    if (req.admin.role === 'super_admin') {
+      return next();
+    }
+
+    // Check if admin has the required permission
+    if (req.admin.permissions && req.admin.permissions.includes(requiredPermission)) {
+      return next();
+    }
+
+    // If neither, deny access
+    return res.status(403).json({ 
+      message: `Access denied. Requires '${requiredPermission}' permission.` 
+    });
+  };
+};
+
+module.exports = { protectAdmin, checkPermission };
