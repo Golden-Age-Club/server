@@ -5,7 +5,15 @@ class CCPaymentService {
   constructor() {
     this.appId = process.env.CCPAYMENT_APP_ID;
     this.appSecret = process.env.CCPAYMENT_APP_SECRET;
-    this.baseUrl = process.env.CCPAYMENT_API_URL;
+    this.appId = process.env.CCPAYMENT_APP_ID;
+    this.appSecret = process.env.CCPAYMENT_APP_SECRET;
+    this.baseUrl = process.env.CCPAYMENT_API_URL || 'https://ebc.ccpayment.com';
+
+    // Auto-fix common configuration error
+    if (this.baseUrl.includes('admin.ccpayment.com')) {
+      console.warn('⚠️ Warning: CCPAYMENT_API_URL is set to admin console. Auto-correcting to API host (ebc.ccpayment.com).');
+      this.baseUrl = this.baseUrl.replace('admin.ccpayment.com', 'ebc.ccpayment.com');
+    }
 
     if (!this.appId || !this.appSecret || !this.baseUrl) {
       console.warn('CCPayment credentials missing');
