@@ -85,9 +85,9 @@ class CCPaymentService {
       const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
 
       // robustness: Check if baseUrl already contains the path
-      let endpoint = '/ccpayment/v2/createInvoiceUrl';
+      let endpoint = '/ccpayment/v2/bill/create';
       if (cleanBaseUrl.includes('/ccpayment/v2')) {
-        endpoint = '/createInvoiceUrl';
+        endpoint = '/bill/create';
       }
 
       const response = await axios.post(
