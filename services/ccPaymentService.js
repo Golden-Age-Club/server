@@ -81,8 +81,17 @@ class CCPaymentService {
       const bodyStr = JSON.stringify(payload);
       const sign = this._generateV2Signature(timestamp, bodyStr);
 
+      // robustness: Remove potential trailing slash from baseUrl
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+
+      // robustness: Check if baseUrl already contains the path
+      let endpoint = '/ccpayment/v2/createInvoiceUrl';
+      if (cleanBaseUrl.includes('/ccpayment/v2')) {
+        endpoint = '/createInvoiceUrl';
+      }
+
       const response = await axios.post(
-        `${this.baseUrl}/ccpayment/v2/createInvoiceUrl`, // Adjust endpoint if needed based on API docs or Python usage
+        `${cleanBaseUrl}${endpoint}`,
         payload,
         {
           headers: {
