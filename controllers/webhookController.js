@@ -13,6 +13,16 @@ exports.ccPaymentWebhook = async (req, res) => {
     console.log(`Webhook received: order_id=${body.merchant_order_id}, status=${body.order_status}`);
 
     // Verify signature
+    if (body.type === 'ActivateWebhookURL') {
+      if (ccPaymentService.verifyActivationSignature(timestamp, sign, body)) {
+        console.log('✅ Webhook Activation Successful');
+        return res.status(200).json({ msg: 'Success' });
+      } else {
+        console.warn('⚠️ Webhook Activation Failed: Invalid Signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+    }
+
     if (!ccPaymentService.verifyWebhookSignature(timestamp, sign, body)) {
       console.warn(`⚠️ Invalid webhook signature for order: ${body.merchant_order_id}`);
       return res.status(401).json({ message: 'Invalid signature' });

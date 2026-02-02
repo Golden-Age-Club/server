@@ -27,13 +27,14 @@ class CCPaymentService {
   }
 
   /**
-   * Verify webhook signature
+  /**
+   * Verify webhook signature (Standard)
    */
   verifyWebhookSignature(timestamp, sign, data) {
+    // ... existing logic ...
     try {
-      // Logic from Python: sort keys, join k=v, append timestamp, HMAC-SHA256
-      // Note: Python _generate_signature seems to be for V1 or specific webhook format
-      // Let's implement the one from the Python code exactly
+      if (!this.appSecret) return false;
+
       const sortedParams = Object.keys(data).sort();
       const signStrArr = [];
 
@@ -63,6 +64,25 @@ class CCPaymentService {
       console.error('Signature verification error:', error);
       return false;
     }
+  }
+
+  /**
+   * Verify Activation Signature (Special Case)
+   * signature = HMAC_SHA256(AppId + Timestamp + JSON.stringify(Body))
+   */
+  verifyActivationSignature(timestamp, sign, body) {
+    if (!this.appId || !this.appSecret) return false;
+
+    let signText = `${this.appId}${timestamp}`;
+    if (body && Object.keys(body).length > 0) {
+      signText += JSON.stringify(body);
+    }
+
+    const hmac = crypto.createHmac('sha256', this.appSecret);
+    hmac.update(signText);
+    const expectedSign = hmac.digest('hex');
+
+    return sign === expectedSign;
   }
 
   /**
