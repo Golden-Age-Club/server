@@ -5,14 +5,12 @@ class CCPaymentService {
   constructor() {
     this.appId = process.env.CCPAYMENT_APP_ID;
     this.appSecret = process.env.CCPAYMENT_APP_SECRET;
-    this.appId = process.env.CCPAYMENT_APP_ID;
-    this.appSecret = process.env.CCPAYMENT_APP_SECRET;
-    this.baseUrl = process.env.CCPAYMENT_API_URL || 'https://ebc.ccpayment.com';
+    this.baseUrl = process.env.CCPAYMENT_API_URL || 'https://ccpayment.com';
 
-    // Auto-fix common configuration error
+    // Auto-fix: Customer support confirmed API host is ccpayment.com (not admin)
     if (this.baseUrl.includes('admin.ccpayment.com')) {
-      console.warn('⚠️ Warning: CCPAYMENT_API_URL is set to admin console. Auto-correcting to API host (ebc.ccpayment.com).');
-      this.baseUrl = this.baseUrl.replace('admin.ccpayment.com', 'ebc.ccpayment.com');
+      console.warn('⚠️ Warning: CCPAYMENT_API_URL is set to admin console. Auto-correcting to API host (ccpayment.com).');
+      this.baseUrl = this.baseUrl.replace('admin.ccpayment.com', 'ccpayment.com');
     }
 
     if (!this.appId || !this.appSecret || !this.baseUrl) {
@@ -92,10 +90,12 @@ class CCPaymentService {
       // robustness: Remove potential trailing slash from baseUrl
       const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
 
-      // robustness: Check if baseUrl already contains the path
-      let endpoint = '/ccpayment/v2/bill/create';
+      // robustness: Endpoint from support chat: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
+      let endpoint = '/ccpayment/v2/createInvoiceUrl';
+
+      // Handle case where user put the full path in the env var
       if (cleanBaseUrl.includes('/ccpayment/v2')) {
-        endpoint = '/bill/create';
+        endpoint = '/createInvoiceUrl';
       }
 
       const response = await axios.post(
