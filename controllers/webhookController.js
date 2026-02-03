@@ -276,30 +276,34 @@ exports.unifiedCallback = async (req, res) => {
       }
 
       // Calculate Payout
-      // User indicates winAmount is Net Profit, so we must add the original Bet Amount to the payout.
-      // We fetch the bet amount from the database using roundId.
+      // User indicates winAmount is Net Profit.
+      // If winAmount > 0, it's a win, so we return Stake + Profit.
+      // If winAmount == 0, it's a loss, so we return 0 (Stake is kept by house).
       let winAmt = parseFloat(winAmount);
-      let betAmt = 0;
+      let totalPayout = winAmt;
 
-      // Check if we already refunded the stake for this round (to handle multi-part wins)
-      const previousWinsCount = await Transaction.countDocuments({
-        round_id: roundId,
-        type: 'game_win',
-        user_id: userIdStr
-      });
+      if (winAmt > 0) {
+        let betAmt = 0;
 
-      if (previousWinsCount === 0) {
-        const betTxs = await Transaction.find({
+        // Check if we already refunded the stake for this round (to handle multi-part wins)
+        const previousWinsCount = await Transaction.countDocuments({
           round_id: roundId,
-          type: 'game_bet',
+          type: 'game_win',
           user_id: userIdStr
         });
-        if (betTxs.length > 0) {
-          betAmt = betTxs.reduce((sum, tx) => sum + tx.amount, 0);
-        }
-      }
 
-      const totalPayout = betAmt + winAmt;
+        if (previousWinsCount === 0) {
+          const betTxs = await Transaction.find({
+            round_id: roundId,
+            type: 'game_bet',
+            user_id: userIdStr
+          });
+          if (betTxs.length > 0) {
+            betAmt = betTxs.reduce((sum, tx) => sum + tx.amount, 0);
+          }
+        }
+        totalPayout = betAmt + winAmt;
+      }
       const beforeBalance = user.balance;
       const newBalance = beforeBalance + totalPayout;
 
