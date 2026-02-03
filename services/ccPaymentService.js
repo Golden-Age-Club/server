@@ -5,7 +5,13 @@ class CCPaymentService {
   constructor() {
     this.appId = process.env.CCPAYMENT_APP_ID;
     this.appSecret = process.env.CCPAYMENT_APP_SECRET;
-    this.baseUrl = process.env.CCPAYMENT_API_URL;
+    this.baseUrl = process.env.CCPAYMENT_API_URL || 'https://ccpayment.com';
+
+    // Auto-fix: Customer support confirmed API host is ccpayment.com (not admin)
+    if (this.baseUrl.includes('admin.ccpayment.com')) {
+      console.warn('⚠️ Warning: CCPAYMENT_API_URL is set to admin console. Auto-correcting to API host (ccpayment.com).');
+      this.baseUrl = this.baseUrl.replace('admin.ccpayment.com', 'ccpayment.com');
+    }
 
     if (!this.appId || !this.appSecret || !this.baseUrl) {
       console.warn('CCPayment credentials missing');
@@ -21,22 +27,23 @@ class CCPaymentService {
   }
 
   /**
-   * Verify webhook signature
+  /**
+   * Verify webhook signature (Standard)
    */
   verifyWebhookSignature(timestamp, sign, data) {
+    // ... existing logic ...
     try {
-      // Logic from Python: sort keys, join k=v, append timestamp, HMAC-SHA256
-      // Note: Python _generate_signature seems to be for V1 or specific webhook format
-      // Let's implement the one from the Python code exactly
+      if (!this.appSecret) return false;
+
       const sortedParams = Object.keys(data).sort();
       const signStrArr = [];
-      
+
       for (const key of sortedParams) {
         if (data[key] !== null && data[key] !== undefined) {
           signStrArr.push(`${key}=${data[key]}`);
         }
       }
-      
+
       let signStr = signStrArr.join('&');
       signStr = `${signStr}&timestamp=${timestamp}`;
 
@@ -45,11 +52,37 @@ class CCPaymentService {
         .update(signStr)
         .digest('hex');
 
-      return sign === expectedSignature;
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+      const receivedBuffer = Buffer.from(sign, 'utf8');
+
+      if (expectedBuffer.length !== receivedBuffer.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
     } catch (error) {
       console.error('Signature verification error:', error);
       return false;
     }
+  }
+
+  /**
+   * Verify Activation Signature (Special Case)
+   * signature = HMAC_SHA256(AppId + Timestamp + JSON.stringify(Body))
+   */
+  verifyActivationSignature(timestamp, sign, body) {
+    if (!this.appId || !this.appSecret) return false;
+
+    let signText = `${this.appId}${timestamp}`;
+    if (body && Object.keys(body).length > 0) {
+      signText += JSON.stringify(body);
+    }
+
+    const hmac = crypto.createHmac('sha256', this.appSecret);
+    hmac.update(signText);
+    const expectedSign = hmac.digest('hex');
+
+    return sign === expectedSign;
   }
 
   /**
@@ -58,7 +91,7 @@ class CCPaymentService {
   async createPaymentOrder({ orderId, amount, currency, productName = "Casino Deposit", notifyUrl, returnUrl }) {
     try {
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      
+
       // V2 Payload
       const payload = {
         orderId: orderId,
@@ -74,8 +107,19 @@ class CCPaymentService {
       const bodyStr = JSON.stringify(payload);
       const sign = this._generateV2Signature(timestamp, bodyStr);
 
+      // robustness: Remove potential trailing slash from baseUrl
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+
+      // robustness: Endpoint from support chat: https://ccpayment.com/ccpayment/v2/createInvoiceUrl
+      let endpoint = '/ccpayment/v2/createInvoiceUrl';
+
+      // Handle case where user put the full path in the env var
+      if (cleanBaseUrl.includes('/ccpayment/v2')) {
+        endpoint = '/createInvoiceUrl';
+      }
+
       const response = await axios.post(
-        `${this.baseUrl}/ccpayment/v2/createInvoiceUrl`, // Adjust endpoint if needed based on API docs or Python usage
+        `${cleanBaseUrl}${endpoint}`,
         payload,
         {
           headers: {
