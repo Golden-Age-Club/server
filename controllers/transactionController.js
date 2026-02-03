@@ -5,56 +5,56 @@ const User = require('../models/User');
 // @route   GET /api/transactions/recent
 // @access  Public
 const getRecentTransactions = async (req, res) => {
+  // ... existing logic ...
+};
+
+// @desc    Get authenticated user's transactions
+// @route   GET /api/transactions/me
+// @access  Private
+const getMyTransactions = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 50;
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const type = req.query.type; // 'deposit', 'withdrawal', 'game_win', 'game_bet'
 
-    const transactions = await Transaction.find({})
-      .sort({ created_at: -1 })
-      .limit(safeLimit)
-      .lean(); // Convert to plain JS objects
+    const query = { user_id: req.user._id };
 
-    // Enrich with usernames
-    // Note: In high traffic, use aggregation or cache. For MVP, this is fine.
-    const results = await Promise.all(transactions.map(async (tx) => {
-      let username = "Player";
-      if (tx.user_id) {
-        try {
-          const user = await User.findById(tx.user_id).select('username');
-          if (user && user.username) {
-            username = user.username;
-          }
-        } catch (err) {
-          // Ignore error, keep default
-        }
+    // Filter by type if provided
+    if (type) {
+      if (type === 'deposit') {
+        query.type = 'deposit';
+      } else if (type === 'withdrawal') {
+        query.type = 'withdrawal';
+      } else if (type === 'game') {
+        query.type = { $in: ['game_bet', 'game_win', 'game_refund'] };
       }
+    }
 
-      // Map type for frontend display
-      let mappedType = tx.type;
-      if (tx.type === 'game_win') mappedType = 'win';
-      else if (tx.type === 'game_bet') mappedType = 'bet';
-      else if (tx.type === 'game_refund') mappedType = 'refund';
+    const total = await Transaction.countDocuments(query);
+    const transactions = await Transaction.find(query)
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-      return {
-        transaction_id: tx._id,
-        user_id: tx.user_id,
-        username: username,
-        amount: tx.amount,
-        currency: tx.currency || 'USD',
-        type: mappedType,
-        game_id: tx.game_id || "Unknown Game", // Make sure game_id is in schema if needed
-        timestamp: tx.created_at
-      };
-    }));
-
-    res.json(results);
+    res.json({
+      transactions,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
 
   } catch (error) {
-    console.error("Get recent transactions error", error);
+    console.error("Get my transactions error", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 module.exports = {
-  getRecentTransactions
+  getRecentTransactions,
+  getMyTransactions
 };
