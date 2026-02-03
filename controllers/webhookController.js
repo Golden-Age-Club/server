@@ -275,9 +275,33 @@ exports.unifiedCallback = async (req, res) => {
         });
       }
 
-      const winAmt = parseFloat(winAmount);
+      // Calculate Payout
+      // User indicates winAmount is Net Profit, so we must add the original Bet Amount to the payout.
+      // We fetch the bet amount from the database using roundId.
+      let winAmt = parseFloat(winAmount);
+      let betAmt = 0;
+
+      // Check if we already refunded the stake for this round (to handle multi-part wins)
+      const previousWinsCount = await Transaction.countDocuments({
+        round_id: roundId,
+        type: 'game_win',
+        user_id: userIdStr
+      });
+
+      if (previousWinsCount === 0) {
+        const betTxs = await Transaction.find({
+          round_id: roundId,
+          type: 'game_bet',
+          user_id: userIdStr
+        });
+        if (betTxs.length > 0) {
+          betAmt = betTxs.reduce((sum, tx) => sum + tx.amount, 0);
+        }
+      }
+
+      const totalPayout = betAmt + winAmt;
       const beforeBalance = user.balance;
-      const newBalance = beforeBalance + winAmt;
+      const newBalance = beforeBalance + totalPayout;
 
       // Add Balance
       user.balance = newBalance;
@@ -287,7 +311,7 @@ exports.unifiedCallback = async (req, res) => {
       await Transaction.create({
         user_id: userIdStr,
         type: 'game_win',
-        amount: winAmt,
+        amount: totalPayout,
         currency: currencyId || 'USD',
         status: 'completed',
         merchant_order_id: transactionId,
