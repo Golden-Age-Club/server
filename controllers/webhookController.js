@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const Transaction = require('../models/Transaction');
+const { Transaction } = require('../models/Transaction');
 const User = require('../models/User');
 const PaymentRecord = require('../models/PaymentRecord');
 const ccPaymentService = require('../services/ccPaymentService');
@@ -70,7 +70,8 @@ exports.ccPaymentWebhook = async (req, res) => {
             $set: {
               status: 'completed',
               completed_at: new Date(),
-              webhook_data: body
+              webhook_data: body,
+              payment_record_id: record._id
             }
           },
           { new: true }
@@ -89,10 +90,10 @@ exports.ccPaymentWebhook = async (req, res) => {
           await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'duplicate' });
         }
       } else if (order_status === 'expired') {
-        await Transaction.updateOne({ _id: transaction._id }, { status: 'expired', webhook_data: body });
+        await Transaction.updateOne({ _id: transaction._id }, { status: 'expired', webhook_data: body, payment_record_id: record._id });
         await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' }); // successfully processed the expiration
       } else if (order_status === 'failed') {
-        await Transaction.updateOne({ _id: transaction._id }, { status: 'failed', webhook_data: body });
+        await Transaction.updateOne({ _id: transaction._id }, { status: 'failed', webhook_data: body, payment_record_id: record._id });
         await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' });
       }
     }
@@ -106,7 +107,8 @@ exports.ccPaymentWebhook = async (req, res) => {
             $set: {
               status: 'completed',
               completed_at: new Date(),
-              webhook_data: body
+              webhook_data: body,
+              payment_record_id: record._id
             }
           }
         );
@@ -126,7 +128,8 @@ exports.ccPaymentWebhook = async (req, res) => {
           {
             $set: {
               status: 'failed',
-              webhook_data: body
+              webhook_data: body,
+              payment_record_id: record._id
             }
           },
           { new: true }

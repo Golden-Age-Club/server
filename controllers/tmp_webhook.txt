@@ -1,0 +1,50 @@
+        // Only update if status is NOT 'completed'
+        const updatedTx = await Transaction.findOneAndUpdate(
+          { _id: transaction._id, status: { $ne: 'completed' } },
+          {
+            $set: {
+              status: 'completed',
+              completed_at: new Date(),
+              webhook_data: body
+            }
+          },
+          { new: true }
+        );
+
+        if (updatedTx) {
+          console.log(`Processing deposit confirmation: user = ${transaction.user_id}, amount = ${transaction.amount} `);
+
+          // Only credit balance if transaction update succeeded
+          await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
+
+          console.log(`✅ Deposit completed: transaction_id = ${transaction._id} `);
+          await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' });
+        } else {
+          console.log(`⚠️ Deposit already processed(duplicate webhook): transaction_id = ${transaction._id} `);
+          await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'duplicate' });
+        }
+      } else if (order_status === 'expired') {
+        await Transaction.updateOne({ _id: transaction._id }, { status: 'expired', webhook_data: body, payment_record_id: record._id });
+        await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' }); // successfully processed the expiration
+      } else if (order_status === 'failed') {
+        await Transaction.updateOne({ _id: transaction._id }, { status: 'failed', webhook_data: body, payment_record_id: record._id });
+        await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' });
+      }
+    }
+    // Handle Withdrawal
+    else if (transaction.type === 'withdrawal') {
+      if (order_status === 'success' || order_status === 'completed') {
+        // Atomic update
+        const updatedTx = await Transaction.findOneAndUpdate(
+          { _id: transaction._id, status: { $ne: 'completed' } },
+          {
+            $set: {
+              status: 'completed',
+              completed_at: new Date(),
+              webhook_data: body
+            }
+          }
+        );
+
+        if (updatedTx) {
+          console.log(`✅ Withdrawal completed: transaction_id = ${transaction._id} `);

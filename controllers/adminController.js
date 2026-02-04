@@ -13,12 +13,13 @@ class AdminController {
    */
   static async seedSuperAdmin() {
     try {
-      const email = "admin@pghomeco";
+      const email = process.env.INITIAL_ADMIN_EMAIL || "admin@pghomeco";
+      const password = process.env.INITIAL_ADMIN_PASSWORD || "Googe111";
       const existingAdmin = await Admin.findOne({ email });
 
       if (!existingAdmin) {
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash("Googe111", salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
         await Admin.create({
           email,
@@ -31,9 +32,9 @@ class AdminController {
           permissions: ['dashboard', 'users', 'finance', 'bets', 'vip', 'risk', 'promotions', 'reports', 'system'],
           bio: "Default system super administrator."
         });
-        console.log('✅ Super Admin created successfully');
+        console.log(`✅ Super Admin created successfully (${email})`);
       } else {
-        console.log('ℹ️ Super Admin already exists');
+        console.log(`ℹ️ Super Admin already exists (${email})`);
       }
     } catch (error) {
       console.error('❌ Error seeding super admin:', error);
