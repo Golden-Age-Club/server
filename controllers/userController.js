@@ -6,7 +6,7 @@ const User = require('../models/User');
 const getTopUsers = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
-    
+
     // Validate limit
     if (limit < 1 || limit > 100) {
       return res.status(400).json({ message: 'Limit must be between 1 and 100' });
@@ -34,6 +34,7 @@ const getMe = async (req, res) => {
     // req.user is set by auth middleware
     const user = await User.findById(req.user._id);
     if (user) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.json(user);
     } else {
       res.status(404).json({ message: 'User not found' });

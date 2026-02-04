@@ -106,6 +106,7 @@ const getBalance = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({ balance: user.balance });
   } catch (error) {
     console.error("Get balance error", error);
