@@ -97,7 +97,24 @@ const createWithdrawal = async (req, res) => {
   }
 };
 
+// @desc    Get Balance
+// @route   GET /api/wallet/balance
+// @access  Private
+const getBalance = async (req, res) => {
+  try {
+    const user = await require('../models/User').findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ balance: user.balance });
+  } catch (error) {
+    console.error("Get balance error", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createDeposit,
-  createWithdrawal
+  createWithdrawal,
+  getBalance
 };

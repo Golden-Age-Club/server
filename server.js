@@ -85,6 +85,10 @@ const startServer = async () => {
   // Seed Super Admin
   await AdminController.seedSuperAdmin();
 
+  // Seed System Settings
+  const SystemController = require('./controllers/SystemController');
+  await SystemController.initDefaultSettings();
+
   // Expire stale pending transactions (older than 24 hours) on startup
   try {
     const { Transaction } = require('./models/Transaction');

@@ -4,7 +4,7 @@ const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 
 class SystemController {
-  
+
   // --- Settings ---
 
   /**
@@ -29,16 +29,22 @@ class SystemController {
    */
   static async updateSettings(req, res) {
     try {
-      const updates = req.body; // Expects object { key: value } or array of updates
+      const updates = req.body; // Expects object { key: value }
 
       const results = [];
       for (const [key, value] of Object.entries(updates)) {
-        const setting = await SystemSetting.findOneAndUpdate(
-          { key },
-          { value },
-          { new: true, upsert: true, setDefaultsOnInsert: true }
-        );
-        results.push(setting);
+        // Find existing to preserve label/category if we don't have them in updates
+        const existing = await SystemSetting.findOne({ key });
+
+        if (existing) {
+          existing.value = value;
+          const updated = await existing.save();
+          results.push(updated);
+        } else {
+          // If it doesn't exist, we might need a default label/category or just skip it
+          // For now, let's skip unknown keys to avoid validation errors
+          console.warn(`Attempted to update unknown system setting: ${key}`);
+        }
       }
 
       // Log action
@@ -69,6 +75,8 @@ class SystemController {
       { key: 'userRegistration', value: true, label: 'User Registration', category: 'security', description: 'Allow new user registrations' },
       { key: 'maxLoginAttempts', value: 5, label: 'Max Login Attempts', category: 'security', description: 'Maximum failed login attempts before account lockout' },
       { key: 'sessionTimeout', value: 30, label: 'Session Timeout (minutes)', category: 'security', description: 'Time before user session expires' },
+      { key: 'minDeposit', value: 10, label: 'Minimum Deposit', category: 'payment', description: 'Minimum allowed deposit amount' },
+      { key: 'minWithdrawal', value: 10, label: 'Minimum Withdrawal', category: 'payment', description: 'Minimum allowed withdrawal amount' },
     ];
 
     for (const def of defaults) {
@@ -237,7 +245,7 @@ class SystemController {
       }
 
       const admin = await Admin.findByIdAndDelete(req.params.id);
-      
+
       if (!admin) {
         return res.status(404).json({ message: 'Admin not found' });
       }
