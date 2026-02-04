@@ -7,8 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 // Middleware
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
   : [];
 
 app.use(cors({
@@ -31,7 +31,7 @@ const connectDB = async () => {
 
     // Simplified connection options for troubleshooting
     await mongoose.connect(mongoUrl);
-    
+
     console.log(`Connected to MongoDB: ${mongoUrl.split('@')[1]}`); // Log only the host part for security
   } catch (error) {
     console.error('MongoDB connection error:', error);
@@ -81,9 +81,37 @@ app.get('/health', (req, res) => {
 // Start Server
 const startServer = async () => {
   await connectDB();
-  
+
   // Seed Super Admin
   await AdminController.seedSuperAdmin();
+
+  // Seed System Settings
+  const SystemController = require('./controllers/SystemController');
+  await SystemController.initDefaultSettings();
+
+  // Expire stale pending transactions (older than 24 hours) on startup
+  try {
+    const { Transaction } = require('./models/Transaction');
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const result = await Transaction.updateMany(
+      {
+        status: 'pending',
+        created_at: { $lt: twentyFourHoursAgo },
+        type: { $in: ['deposit', 'withdrawal'] }
+      },
+      {
+        $set: {
+          status: 'expired',
+          error_message: 'Auto-expired due to inactivity'
+        }
+      }
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`🧹 Auto-expired ${result.modifiedCount} stale pending transactions`);
+    }
+  } catch (err) {
+    console.error('Failed to expire stale transactions:', err);
+  }
 
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);

@@ -22,7 +22,7 @@ class WalletService {
 
     try {
       const notifyUrl = process.env.WEBHOOK_URL;
-      
+
       const paymentData = await ccPaymentService.createPaymentOrder({
         orderId: merchantOrderId,
         amount: amount,
@@ -36,7 +36,7 @@ class WalletService {
       transaction.payment_url = paymentData.paymentUrl || paymentData.payUrl; // Adjust based on actual CCPayment response key
       transaction.payment_address = paymentData.address; // If crypto deposit
       transaction.ccpayment_order_id = paymentData.orderId; // External ID
-      
+
       // Save updates
       await transaction.save();
 
@@ -57,9 +57,9 @@ class WalletService {
     // 1. Check balance and deduct (Atomic operation)
     // In Mongoose, we can use findOneAndUpdate with condition
     const user = await User.findOneAndUpdate(
-      { 
-        _id: userId, 
-        balance: { $gte: amount } 
+      {
+        _id: userId,
+        balance: { $gte: amount }
       },
       { $inc: { balance: -amount } },
       { new: true }
@@ -85,12 +85,45 @@ class WalletService {
 
       // Note: If you have auto-withdrawal logic via CCPayment, call it here.
       // For now, we leave it as PENDING for admin approval or background worker.
-      
+
       return transaction;
 
     } catch (error) {
       // Refund balance if transaction creation fails (unlikely but safe)
       await User.findByIdAndUpdate(userId, { $inc: { balance: amount } });
+      throw error;
+    }
+  }
+
+  /**
+   * Process the actual payout via CCPayment (Admin Approved)
+   */
+  async processPayout(transactionId) {
+    const transaction = await Transaction.findById(transactionId);
+    if (!transaction) throw new Error("Transaction not found");
+    if (transaction.type !== TransactionType.WITHDRAWAL) throw new Error("Not a withdrawal");
+
+    try {
+      // Find currency network (Default to TRC20 for USDT if not specified)
+      // This matches the frontend logic in Wallet.jsx
+      const network = transaction.currency.includes('ERC20') ? 'ERC20' :
+        transaction.currency.includes('BEP20') ? 'BEP20' : 'TRC20';
+
+      const payoutData = await ccPaymentService.createPayoutOrder({
+        orderId: transaction.merchant_order_id,
+        amount: transaction.amount,
+        address: transaction.wallet_address,
+        currency: 'USDT',
+        network: network
+      });
+
+      // Update transaction with provider info
+      transaction.ccpayment_order_id = payoutData.orderId;
+      await transaction.save();
+
+      return payoutData;
+    } catch (error) {
+      console.error("Payout execution error:", error);
       throw error;
     }
   }

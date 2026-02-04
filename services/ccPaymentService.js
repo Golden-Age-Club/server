@@ -137,6 +137,49 @@ class CCPaymentService {
       throw error;
     }
   }
+
+  /**
+   * Create Payout Order (Withdrawal)
+   */
+  async createPayoutOrder({ orderId, amount, address, currency = 'USDT', network = 'TRC20' }) {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+
+      // V2 Payout Payload
+      const payload = {
+        orderId: orderId,
+        amount: amount.toString(),
+        address: address,
+        crypto: currency,
+        network: network,
+        fiatId: 1033 // USD
+      };
+
+      const bodyStr = JSON.stringify(payload);
+      const sign = this._generateV2Signature(timestamp, bodyStr);
+
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+      const endpoint = '/ccpayment/v2/payout';
+
+      const response = await axios.post(
+        `${cleanBaseUrl}${endpoint}`,
+        payload,
+        {
+          headers: {
+            'App-Id': this.appId,
+            'Timestamp': timestamp,
+            'Sign': sign,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Create payout order error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new CCPaymentService();

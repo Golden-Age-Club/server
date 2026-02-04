@@ -2,23 +2,25 @@ const Admin = require('../models/Admin');
 const User = require('../models/User');
 const { Transaction } = require('../models/Transaction');
 const VipTier = require('../models/VipTier');
+const PaymentRecord = require('../models/PaymentRecord');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 class AdminController {
-  
+
   /**
    * Seed the super admin user if it doesn't exist
    */
   static async seedSuperAdmin() {
     try {
-      const email = "admin@pghomeco";
+      const email = process.env.INITIAL_ADMIN_EMAIL || "admin@pghomeco";
+      const password = process.env.INITIAL_ADMIN_PASSWORD || "Googe111";
       const existingAdmin = await Admin.findOne({ email });
-      
+
       if (!existingAdmin) {
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash("Googe111", salt);
-        
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         await Admin.create({
           email,
           password_hash: hashedPassword,
@@ -30,9 +32,9 @@ class AdminController {
           permissions: ['dashboard', 'users', 'finance', 'bets', 'vip', 'risk', 'promotions', 'reports', 'system'],
           bio: "Default system super administrator."
         });
-        console.log('✅ Super Admin created successfully');
+        console.log(`✅ Super Admin created successfully (${email})`);
       } else {
-        console.log('ℹ️ Super Admin already exists');
+        console.log(`ℹ️ Super Admin already exists (${email})`);
       }
     } catch (error) {
       console.error('❌ Error seeding super admin:', error);
@@ -86,7 +88,7 @@ class AdminController {
   static async getProfile(req, res) {
     try {
       const admin = await Admin.findById(req.admin._id).select('-password_hash');
-      
+
       if (admin) {
         // Format response to match ProfilePage.jsx expectations
         res.json({
@@ -125,7 +127,7 @@ class AdminController {
         admin.first_name = req.body.first_name || admin.first_name;
         admin.last_name = req.body.last_name || admin.last_name;
         admin.email = req.body.email || admin.email;
-        
+
         if (req.body.bio !== undefined) admin.bio = req.body.bio;
         if (req.body.phone !== undefined) admin.phone = req.body.phone;
         if (req.body.location !== undefined) admin.location = req.body.location;
@@ -238,7 +240,7 @@ class AdminController {
       });
 
       // --- Calculations ---
-      
+
       // GGR
       const ggr = allTimeStats.totalBets - allTimeStats.totalWins;
       const ggrCurrent = currentPeriodStats.totalBets - currentPeriodStats.totalWins;
@@ -269,7 +271,7 @@ class AdminController {
         created_at: { $gte: new Date(now.getTime() - 48 * 60 * 60 * 1000), $lt: oneDayAgo }
       });
       const dauPrevious = dauPreviousResult.length;
-      
+
       const dauChange = dauPrevious !== 0 ? ((dauCurrent - dauPrevious) / dauPrevious) * 100 : 0;
 
 
@@ -318,8 +320,8 @@ class AdminController {
         startDate = new Date(now);
         startDate.setDate(now.getDate() - 6); // Last 7 days
         startDate.setHours(0, 0, 0, 0);
-        groupBy = { 
-          $dateToString: { format: "%Y-%m-%d", date: "$created_at" } 
+        groupBy = {
+          $dateToString: { format: "%Y-%m-%d", date: "$created_at" }
         };
         // Generate labels for last 7 days
         for (let i = 0; i < 7; i++) {
@@ -331,8 +333,8 @@ class AdminController {
         startDate = new Date(now);
         startDate.setDate(now.getDate() - 29); // Last 30 days
         startDate.setHours(0, 0, 0, 0);
-        groupBy = { 
-          $dateToString: { format: "%Y-%m-%d", date: "$created_at" } 
+        groupBy = {
+          $dateToString: { format: "%Y-%m-%d", date: "$created_at" }
         };
         // Generate labels? Too many points for x-axis maybe, but okay for line chart
         // Let's rely on the aggregation result to sort and map
@@ -342,8 +344,8 @@ class AdminController {
         startDate.setMonth(now.getMonth() - 11);
         startDate.setDate(1);
         startDate.setHours(0, 0, 0, 0);
-        groupBy = { 
-          $dateToString: { format: "%Y-%m", date: "$created_at" } 
+        groupBy = {
+          $dateToString: { format: "%Y-%m", date: "$created_at" }
         };
       }
 
@@ -422,7 +424,7 @@ class AdminController {
           dataMap[key] = { revenue: 0, expenses: 0 };
           current.setDate(current.getDate() + 1);
         }
-        
+
         // Re-generate labels to match the keys order
         processedLabels = labels;
 
@@ -439,12 +441,12 @@ class AdminController {
         });
 
       } else {
-         // Month - just return raw daily data
-         stats.forEach(item => {
-           processedLabels.push(item._id.slice(5)); // MM-DD
-           revenueData.push(item.totalBets - item.totalWins);
-           expensesData.push(item.totalWins);
-         });
+        // Month - just return raw daily data
+        stats.forEach(item => {
+          processedLabels.push(item._id.slice(5)); // MM-DD
+          revenueData.push(item.totalBets - item.totalWins);
+          expensesData.push(item.totalWins);
+        });
       }
 
       res.json({
@@ -596,7 +598,7 @@ class AdminController {
   static async updateUser(req, res) {
     try {
       const { first_name, last_name, email, vip_level, risk_level, is_active, is_frozen, balance } = req.body;
-      
+
       const user = await User.findById(req.params.id);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
@@ -645,7 +647,7 @@ class AdminController {
   static async getVipTiers(req, res) {
     try {
       let tiers = await VipTier.find().sort({ level: 1 });
-      
+
       // Seed default tiers if empty
       if (tiers.length === 0) {
         const defaultTiers = [
@@ -673,13 +675,13 @@ class AdminController {
   static async updateVipTier(req, res) {
     try {
       const { level, name, min_deposit, min_bets, benefits, color } = req.body;
-      
+
       const tier = await VipTier.findOneAndUpdate(
         { level },
         { name, min_deposit, min_bets, benefits, color },
         { upsert: true, new: true }
       );
-      
+
       res.json(tier);
     } catch (error) {
       console.error('Error updating VIP tier:', error);
@@ -706,22 +708,22 @@ class AdminController {
       // Users with high bets or explicitly VIP
       // We can define "High Value" as total_bet > 1000 OR vip_level > 0
       query.$or = [
-          ...(query.$or || []), 
-          { total_bet: { $gt: 1000 } },
-          { vip_level: { $gt: 0 } }
+        ...(query.$or || []),
+        { total_bet: { $gt: 1000 } },
+        { vip_level: { $gt: 0 } }
       ];
 
       // If search is present, we need to combine it carefully.
       // Actually, standard logic: (search) AND (high value)
       if (search) {
-          query = {
-              $and: [
-                  { $or: [{ username: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] },
-                  { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] }
-              ]
-          };
+        query = {
+          $and: [
+            { $or: [{ username: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] },
+            { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] }
+          ]
+        };
       } else {
-          query = { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] };
+        query = { $or: [{ total_bet: { $gt: 1000 } }, { vip_level: { $gt: 0 } }] };
       }
 
       const users = await User.find(query)
@@ -774,8 +776,8 @@ class AdminController {
       const transactions = await Transaction.find({
         created_at: { $gte: startDate }
       })
-      .populate('user_id', 'username email')
-      .sort({ created_at: -1 });
+        .populate('user_id', 'username email')
+        .sort({ created_at: -1 });
 
       // CSV Header
       let csv = 'Date,Transaction ID,User,Type,Amount,Status,Description\n';
@@ -802,6 +804,51 @@ class AdminController {
     }
   }
 
+
+  /**
+   * Get Payment/Webhook Logs
+   * @route GET /api/admin/payment-logs
+   */
+  static async getPaymentLogs(req, res) {
+    try {
+      const { page = 1, limit = 20, search = '', status, type } = req.query;
+      const skip = (page - 1) * limit;
+
+      let query = {};
+
+      if (search) {
+        query.$or = [
+          { merchant_order_id: { $regex: search, $options: 'i' } },
+          { ip_address: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      if (status) {
+        query.processed_status = status;
+      }
+
+      if (type) {
+        query.webhook_type = type;
+      }
+
+      const logs = await PaymentRecord.find(query)
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      const total = await PaymentRecord.countDocuments(query);
+
+      res.json({
+        logs,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
+      });
+    } catch (error) {
+      console.error('Error fetching payment logs:', error);
+      res.status(500).json({ message: 'Failed to fetch payment logs' });
+    }
+  }
 }
 
 module.exports = AdminController;

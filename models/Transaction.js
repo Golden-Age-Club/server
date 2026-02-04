@@ -86,6 +86,10 @@ const transactionSchema = new mongoose.Schema({
   },
   balance_after: {
     type: Number
+  },
+  payment_record_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PaymentRecord'
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
