@@ -1,4 +1,3 @@
-```javascript
 const jwt = require('jsonwebtoken');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
@@ -29,7 +28,7 @@ exports.ccPaymentWebhook = async (req, res) => {
     const timestamp = headers['timestamp'];
     const sign = headers['sign'];
 
-    console.log(`Webhook received: order_id = ${ body.merchant_order_id }, status = ${ body.order_status } `);
+    console.log(`Webhook received: order_id = ${body.merchant_order_id}, status = ${body.order_status} `);
 
     // Verify signature
     if (body.type === 'ActivateWebhookURL') {
@@ -45,7 +44,7 @@ exports.ccPaymentWebhook = async (req, res) => {
     }
 
     if (!ccPaymentService.verifyWebhookSignature(timestamp, sign, body)) {
-      console.warn(`⚠️ Invalid webhook signature for order: ${ body.merchant_order_id } `);
+      console.warn(`⚠️ Invalid webhook signature for order: ${body.merchant_order_id} `);
       await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'failed', error_message: 'Invalid signature' });
       return res.status(401).json({ message: 'Invalid signature' });
     }
@@ -78,15 +77,15 @@ exports.ccPaymentWebhook = async (req, res) => {
         );
 
         if (updatedTx) {
-          console.log(`Processing deposit confirmation: user = ${ transaction.user_id }, amount = ${ transaction.amount } `);
+          console.log(`Processing deposit confirmation: user = ${transaction.user_id}, amount = ${transaction.amount} `);
 
           // Only credit balance if transaction update succeeded
           await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
 
-          console.log(`✅ Deposit completed: transaction_id = ${ transaction._id } `);
+          console.log(`✅ Deposit completed: transaction_id = ${transaction._id} `);
           await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' });
         } else {
-          console.log(`⚠️ Deposit already processed(duplicate webhook): transaction_id = ${ transaction._id } `);
+          console.log(`⚠️ Deposit already processed(duplicate webhook): transaction_id = ${transaction._id} `);
           await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'duplicate' });
         }
       } else if (order_status === 'expired') {
@@ -113,7 +112,7 @@ exports.ccPaymentWebhook = async (req, res) => {
         );
 
         if (updatedTx) {
-          console.log(`✅ Withdrawal completed: transaction_id = ${ transaction._id } `);
+          console.log(`✅ Withdrawal completed: transaction_id = ${transaction._id} `);
           await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'success' });
         } else {
           await PaymentRecord.findByIdAndUpdate(record._id, { processed_status: 'duplicate' });
@@ -135,10 +134,10 @@ exports.ccPaymentWebhook = async (req, res) => {
 
         if (updatedTx) {
           // Refund balance
-          console.warn(`⚠️ Withdrawal failed, refunding: user = ${ transaction.user_id }, amount = ${ transaction.amount } `);
+          console.warn(`⚠️ Withdrawal failed, refunding: user = ${transaction.user_id}, amount = ${transaction.amount} `);
           await User.findByIdAndUpdate(transaction.user_id, { $inc: { balance: transaction.amount } });
         } else {
-          console.warn(`⚠️ Withdrawal failed webhook received but transaction already final: ${ transaction._id } `);
+          console.warn(`⚠️ Withdrawal failed webhook received but transaction already final: ${transaction._id} `);
         }
       }
     }
@@ -189,7 +188,7 @@ exports.unifiedCallback = async (req, res) => {
           userId = decodedStr;
         }
       } catch (err) {
-        console.error(`Token decode failed: ${ err.message } `);
+        console.error(`Token decode failed: ${err.message} `);
         return res.json({
           result: true,
           err_desc: 'Invalid token',

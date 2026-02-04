@@ -17,6 +17,7 @@ router.put('/auth/password', protectAdmin, AdminController.updatePassword);
 router.get('/stats', protectAdmin, checkPermission('dashboard'), AdminController.getDashboardStats);
 router.get('/charts', protectAdmin, checkPermission('dashboard'), AdminController.getChartStats);
 router.get('/export', protectAdmin, checkPermission('dashboard'), AdminController.exportData);
+router.get('/payment-logs', protectAdmin, AdminController.getPaymentLogs);
 
 
 // User Management
