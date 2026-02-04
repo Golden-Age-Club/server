@@ -1,6 +1,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const GameSetting = require('../models/GameSetting');
+const ProviderSetting = require('../models/ProviderSetting');
 const { Transaction } = require('../models/Transaction');
 
 let gamesCache = {
@@ -35,26 +36,86 @@ class PGProviderService {
       .digest('hex');
   }
 
-  async getOptions() {
+  async getOptions(filterDisabled = true) {
+    let rawData;
+    
+    // 1. Try to get from cache
     if (Date.now() - optionsCache.timestamp < CACHE_DURATION && optionsCache.data) {
-        return optionsCache.data;
+        rawData = optionsCache.data;
+    } else {
+        // 2. Fetch from API if not in cache or expired
+        const requestTime = Date.now().toString();
+        const sign = this._createSign(requestTime);
+
+        const params = {
+          app_id: this.appId,
+          request_time: requestTime,
+          sign: sign
+        };
+
+        try {
+            const response = await axios.get(`${this.baseUrl}/api/v1/get-options`, { params });
+            if (response.data) {
+                optionsCache.data = response.data;
+                optionsCache.timestamp = Date.now();
+                rawData = response.data;
+            }
+        } catch (error) {
+            console.error('Error fetching options from provider:', error.message);
+            // If API fails, try to return stale cache if available
+            if (optionsCache.data) {
+                rawData = optionsCache.data;
+            } else {
+                return null;
+            }
+        }
     }
 
-    const requestTime = Date.now().toString();
-    const sign = this._createSign(requestTime);
+    if (!rawData) return null;
 
-    const params = {
-      app_id: this.appId,
-      request_time: requestTime,
-      sign: sign
-    };
+    // 3. If we don't need to filter, return raw data
+    if (!filterDisabled) return rawData;
 
-    const response = await axios.get(`${this.baseUrl}/api/v1/get-options`, { params });
-    if (response.data) {
-        optionsCache.data = response.data;
-        optionsCache.timestamp = Date.now();
+    // 4. Filter out disabled providers from DB
+    try {
+        const disabledSettings = await ProviderSetting.find({ status: 'disabled' });
+        const disabledIds = disabledSettings.map(s => String(s.provider_id));
+
+        if (rawData.providers && Array.isArray(rawData.providers)) {
+            return {
+                ...rawData,
+                providers: rawData.providers.filter(p => !disabledIds.includes(String(p.id)))
+            };
+        }
+    } catch (err) {
+        console.error('Error filtering disabled providers:', err);
     }
-    return response.data;
+
+    return rawData;
+  }
+
+  async getAdminProviders() {
+    // Get all providers without filtering
+    const data = await this.getOptions(false);
+    if (!data || !data.providers) return [];
+
+    try {
+        const settings = await ProviderSetting.find({});
+        const settingsMap = new Map(settings.map(s => [String(s.provider_id), s]));
+
+        return data.providers.map(p => {
+            const setting = settingsMap.get(String(p.id));
+            return {
+                ...p,
+                db_status: setting ? setting.status : 'enabled',
+                db_updated_at: setting ? setting.updated_at : null
+            };
+        });
+    } catch (err) {
+        console.error('Error fetching provider settings:', err);
+        // Return providers with default status if DB fails
+        return data.providers.map(p => ({ ...p, db_status: 'enabled' }));
+    }
   }
 
   async _fetchGamesFromProvider() {
@@ -82,7 +143,7 @@ class PGProviderService {
     return [];
   }
 
-  async getGames(page = 1, limit = 20, providerId = null, search = null, offset = null) {
+    async getGames(page = 1, limit = 20, providerId = null, search = null, offset = null, limitPerProvider = null) {
     let result = await this._fetchGamesFromProvider();
     
     // 1. Filter by Active Providers
@@ -94,8 +155,20 @@ class PGProviderService {
                 .filter(p => p.is_active === 1 || p.is_active === true) // Assuming 1/true is active
                 .map(p => String(p.id));
             
+            const providerCodeMap = {};
+            const providerTitleMap = {};
+            options.providers.forEach(p => {
+                providerCodeMap[String(p.id)] = p.code;
+                providerTitleMap[String(p.id)] = p.title;
+            });
+
             // Filter games whose provider is active
-            result = result.filter(g => activeProviderIds.includes(String(g.provider_id)));
+            result = result.filter(g => activeProviderIds.includes(String(g.provider_id)))
+                           .map(g => ({
+                               ...g,
+                               provider_code: g.provider_code || providerCodeMap[String(g.provider_id)] || 'Unknown',
+                               provider_title: providerTitleMap[String(g.provider_id)] || providerCodeMap[String(g.provider_id)] || 'Unknown'
+                           }));
         }
     } catch (e) {
         console.warn("Failed to filter by provider status", e);
@@ -115,6 +188,36 @@ class PGProviderService {
     if (providerId) result = result.filter(g => String(g.provider_id) === String(providerId));
     if (search) result = result.filter(g => (g.name || g.title || '').toLowerCase().includes(search.toLowerCase()));
     
+    // 4. Per-Provider Limit (Grouping Mode)
+    if (limitPerProvider) {
+        const limitPer = parseInt(limitPerProvider);
+        const groupedGames = {};
+        
+        // Group by provider_id
+        result.forEach(game => {
+            const pid = String(game.provider_id);
+            if (!groupedGames[pid]) {
+                groupedGames[pid] = [];
+            }
+            if (groupedGames[pid].length < limitPer) {
+                groupedGames[pid].push(game);
+            }
+        });
+
+        // Flatten back to array
+        result = Object.values(groupedGames).flat();
+        
+        // Return without standard pagination logic if in this mode, 
+        // OR simply return all of them as one big page
+        return {
+            games: result,
+            page: 1,
+            limit: result.length,
+            total: result.length,
+            total_pages: 1
+        };
+    }
+
     const start = offset !== null ? parseInt(offset) : (page - 1) * limit;
     const end = start + limit;
     const total = result.length;
@@ -265,6 +368,20 @@ class PGProviderService {
       }
       throw error;
     }
+  }
+  async updateProviderStatus(providerId, status) {
+    if (!['enabled', 'disabled'].includes(status)) {
+        throw new Error('Invalid status');
+    }
+    
+    // Upsert the setting
+    const setting = await ProviderSetting.findOneAndUpdate(
+        { provider_id: providerId },
+        { status: status, updated_at: Date.now() },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    
+    return setting;
   }
 }
 

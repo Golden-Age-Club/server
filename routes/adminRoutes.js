@@ -31,6 +31,8 @@ router.delete('/users/:id', protectAdmin, checkPermission('users'), AdminControl
 router.get('/bets', protectAdmin, checkPermission('bets'), AdminGameController.getBets);
 router.get('/games', protectAdmin, checkPermission('bets'), AdminGameController.getGames);
 router.post('/games/toggle', protectAdmin, checkPermission('bets'), AdminGameController.toggleGame);
+router.get('/games/providers', protectAdmin, checkPermission('bets'), AdminGameController.getProviders);
+router.post('/games/providers/toggle', protectAdmin, checkPermission('bets'), AdminGameController.toggleProvider);
 
 // Risk Management
 router.get('/risk/users', protectAdmin, checkPermission('risk'), RiskController.getAbnormalUsers);

@@ -55,6 +55,58 @@ const getRecentTransactions = async (req, res) => {
   }
 };
 
+// @desc    Get game history (wins/losses)
+// @route   GET /api/transactions/history
+// @access  Public
+const getGameHistory = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+
+    // Only fetch 'game_win' transactions
+    // In our system, 'game_win' with amount 0 is a loss, amount > 0 is a win
+    const transactions = await Transaction.find({ type: 'game_win' })
+      .sort({ created_at: -1 })
+      .limit(safeLimit)
+      .lean();
+
+    const results = await Promise.all(transactions.map(async (tx) => {
+      let username = "Player";
+      if (tx.user_id) {
+        try {
+          const user = await User.findById(tx.user_id).select('username');
+          if (user && user.username) {
+            username = user.username;
+          }
+        } catch (err) {
+          // Ignore error
+        }
+      }
+
+      const amount = parseFloat(tx.amount);
+      const isWin = amount > 0;
+
+      return {
+        transaction_id: tx._id,
+        user_id: tx.user_id,
+        username: username,
+        amount: amount,
+        currency: tx.currency || 'USD',
+        type: isWin ? 'win' : 'lose', // derived type
+        game_id: tx.game_id || "Unknown Game",
+        timestamp: tx.created_at
+      };
+    }));
+
+    res.json(results);
+
+  } catch (error) {
+    console.error("Get game history error", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
-  getRecentTransactions
+  getRecentTransactions,
+  getGameHistory
 };

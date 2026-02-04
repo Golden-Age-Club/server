@@ -4,7 +4,9 @@ const {
   updateWebhookUrl, 
   getPgOptions, 
   getPgGames, 
-  playGame 
+  playGame,
+  getAdminProviders,
+  updateProviderStatus
 } = require('../controllers/casinoController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -12,5 +14,9 @@ router.post('/pg/webhook-update', updateWebhookUrl); // Maybe protect this? Pyth
 router.get('/pg/options', getPgOptions);
 router.get('/pg/games', getPgGames);
 router.post('/pg/play', protect, playGame);
+
+// Admin routes for provider management
+router.get('/pg/providers/admin', protect, getAdminProviders);
+router.post('/pg/providers/status', protect, updateProviderStatus);
 
 module.exports = router;

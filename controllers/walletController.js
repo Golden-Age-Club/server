@@ -1,10 +1,35 @@
 const walletService = require('../services/walletService');
+const SystemSetting = require('../models/SystemSetting');
 
-// Limits (USDT)
-const MIN_DEPOSIT_AMOUNT = 10.0;
-const MAX_DEPOSIT_AMOUNT = 100000.0;
-const MIN_WITHDRAWAL_AMOUNT = 10.0;
-const MAX_WITHDRAWAL_AMOUNT = 50000.0;
+// Default Limits (USDT) - Fallback if not in DB
+const DEFAULTS = {
+  MIN_DEPOSIT: 10.0,
+  MAX_DEPOSIT: 100000.0,
+  MIN_WITHDRAWAL: 10.0,
+  MAX_WITHDRAWAL: 50000.0
+};
+
+// Helper to get limit from SystemSetting
+const getLimit = async (key, defaultValue, label, description) => {
+  try {
+    let setting = await SystemSetting.findOne({ key });
+    if (!setting) {
+      // Lazy init: Create if not exists so Admin sees it
+      setting = await SystemSetting.create({
+        key,
+        value: defaultValue,
+        label,
+        category: 'payment',
+        description,
+        is_public: true
+      });
+    }
+    return parseFloat(setting.value);
+  } catch (err) {
+    console.error(`Error fetching limit ${key}:`, err);
+    return defaultValue;
+  }
+};
 
 // @desc    Create Deposit
 // @route   POST /api/wallet/deposit
@@ -14,12 +39,16 @@ const createDeposit = async (req, res) => {
     const { amount, currency = 'USDT', return_url } = req.body;
     const user = req.user;
 
+    // Get Dynamic Limits
+    const minDeposit = await getLimit('payment_min_deposit', DEFAULTS.MIN_DEPOSIT, 'Min Deposit Amount (USDT)', 'Minimum allowed deposit amount');
+    const maxDeposit = await getLimit('payment_max_deposit', DEFAULTS.MAX_DEPOSIT, 'Max Deposit Amount (USDT)', 'Maximum allowed deposit amount');
+
     // Validate amount
-    if (amount < MIN_DEPOSIT_AMOUNT) {
-      return res.status(400).json({ message: `Minimum deposit amount is ${MIN_DEPOSIT_AMOUNT} USDT` });
+    if (amount < minDeposit) {
+      return res.status(400).json({ message: `Minimum deposit amount is ${minDeposit} USDT` });
     }
-    if (amount > MAX_DEPOSIT_AMOUNT) {
-      return res.status(400).json({ message: `Maximum deposit amount is ${MAX_DEPOSIT_AMOUNT} USDT` });
+    if (amount > maxDeposit) {
+      return res.status(400).json({ message: `Maximum deposit amount is ${maxDeposit} USDT` });
     }
 
     const transaction = await walletService.createDeposit(
@@ -61,12 +90,16 @@ const createWithdrawal = async (req, res) => {
       return res.status(403).json({ message: "Withdrawal restricted due to security alert. Please contact support." });
     }
 
+    // Get Dynamic Limits
+    const minWithdrawal = await getLimit('payment_min_withdrawal', DEFAULTS.MIN_WITHDRAWAL, 'Min Withdrawal Amount (USDT)', 'Minimum allowed withdrawal amount');
+    const maxWithdrawal = await getLimit('payment_max_withdrawal', DEFAULTS.MAX_WITHDRAWAL, 'Max Withdrawal Amount (USDT)', 'Maximum allowed withdrawal amount');
+
     // Validate amount
-    if (amount < MIN_WITHDRAWAL_AMOUNT) {
-      return res.status(400).json({ message: `Minimum withdrawal amount is ${MIN_WITHDRAWAL_AMOUNT} USDT` });
+    if (amount < minWithdrawal) {
+      return res.status(400).json({ message: `Minimum withdrawal amount is ${minWithdrawal} USDT` });
     }
-    if (amount > MAX_WITHDRAWAL_AMOUNT) {
-      return res.status(400).json({ message: `Maximum withdrawal amount is ${MAX_WITHDRAWAL_AMOUNT} USDT` });
+    if (amount > maxWithdrawal) {
+      return res.status(400).json({ message: `Maximum withdrawal amount is ${maxWithdrawal} USDT` });
     }
 
     if (!wallet_address) {

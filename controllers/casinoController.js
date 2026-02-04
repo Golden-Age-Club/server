@@ -52,8 +52,9 @@ const getPgGames = async (req, res) => {
     const providerId = req.query.provider_id;
     const search = req.query.search;
     const offset = req.query.offset;
+    const limitPerProvider = req.query.limit_per_provider;
 
-    const data = await pgProviderService.getGames(page, limit, providerId, search, offset)
+    const data = await pgProviderService.getGames(page, limit, providerId, search, offset, limitPerProvider)
     res.json(data);
   } catch (error) {
     console.error("Error fetching PG games", error);
@@ -121,9 +122,42 @@ const playGame = async (req, res) => {
   }
 };
 
+// @desc    Get All Providers (Admin)
+// @route   GET /api/casino/pg/providers/admin
+// @access  Private (Admin)
+const getAdminProviders = async (req, res) => {
+  try {
+    const data = await pgProviderService.getAdminProviders();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching admin providers", error);
+    res.status(502).json({ message: "Failed to fetch providers" });
+  }
+};
+
+// @desc    Update Provider Status
+// @route   POST /api/casino/pg/providers/status
+// @access  Private (Admin)
+const updateProviderStatus = async (req, res) => {
+  try {
+    const { provider_id, status } = req.body;
+    if (!provider_id || !status) {
+        return res.status(400).json({ message: "provider_id and status are required" });
+    }
+    
+    const result = await pgProviderService.updateProviderStatus(provider_id, status);
+    res.json(result);
+  } catch (error) {
+    console.error("Error updating provider status", error);
+    res.status(502).json({ message: "Failed to update provider status" });
+  }
+};
+
 module.exports = {
   updateWebhookUrl,
   getPgOptions,
   getPgGames,
-  playGame
+  playGame,
+  getAdminProviders,
+  updateProviderStatus
 };

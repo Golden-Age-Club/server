@@ -69,6 +69,10 @@ class SystemController {
       { key: 'userRegistration', value: true, label: 'User Registration', category: 'security', description: 'Allow new user registrations' },
       { key: 'maxLoginAttempts', value: 5, label: 'Max Login Attempts', category: 'security', description: 'Maximum failed login attempts before account lockout' },
       { key: 'sessionTimeout', value: 30, label: 'Session Timeout (minutes)', category: 'security', description: 'Time before user session expires' },
+      { key: 'payment_min_deposit', value: 10.0, label: 'Min Deposit Amount (USDT)', category: 'payment', description: 'Minimum allowed deposit amount' },
+      { key: 'payment_max_deposit', value: 100000.0, label: 'Max Deposit Amount (USDT)', category: 'payment', description: 'Maximum allowed deposit amount' },
+      { key: 'payment_min_withdrawal', value: 10.0, label: 'Min Withdrawal Amount (USDT)', category: 'payment', description: 'Minimum allowed withdrawal amount' },
+      { key: 'payment_max_withdrawal', value: 50000.0, label: 'Max Withdrawal Amount (USDT)', category: 'payment', description: 'Maximum allowed withdrawal amount' },
     ];
 
     for (const def of defaults) {

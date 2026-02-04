@@ -133,3 +133,46 @@ exports.toggleGame = async (req, res) => {
     res.status(500).json({ message: 'Failed to update game status' });
   }
 };
+
+// @desc    Get Providers Management Data
+// @route   GET /api/admin/games/providers
+// @access  Private (Admin)
+exports.getProviders = async (req, res) => {
+  try {
+    const providers = await pgProviderService.getAdminProviders();
+    const search = req.query.search ? req.query.search.toLowerCase() : '';
+    let filtered = providers;
+    if (search) {
+        filtered = providers.filter(p => 
+            String(p.id).toLowerCase().includes(search) || 
+            (p.title && p.title.toLowerCase().includes(search))
+        );
+    }
+    
+    res.json({
+        providers: filtered,
+        total: filtered.length
+    });
+  } catch (error) {
+    console.error('Error fetching providers:', error);
+    res.status(500).json({ message: 'Failed to fetch providers' });
+  }
+};
+
+// @desc    Toggle Provider Status
+// @route   POST /api/admin/games/providers/toggle
+// @access  Private (Admin)
+exports.toggleProvider = async (req, res) => {
+    try {
+        const { providerId, status } = req.body;
+        if (!providerId || !status) {
+            return res.status(400).json({ message: 'Provider ID and status required' });
+        }
+        
+        const result = await pgProviderService.updateProviderStatus(providerId, status);
+        res.json({ success: true, setting: result });
+    } catch (error) {
+        console.error('Error toggling provider:', error);
+        res.status(500).json({ message: 'Failed to toggle provider' });
+    }
+};
