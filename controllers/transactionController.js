@@ -16,7 +16,9 @@ const getMyTransactions = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const type = req.query.type; // 'deposit', 'withdrawal', 'game_win', 'game_bet'
+    const type = req.query.type; // 'deposit', 'withdrawal', 'game'
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
 
     const query = { user_id: req.user._id };
 
@@ -26,8 +28,21 @@ const getMyTransactions = async (req, res) => {
         query.type = 'deposit';
       } else if (type === 'withdrawal') {
         query.type = 'withdrawal';
-      } else if (type === 'game') {
+      } else if (type === 'game' || type === 'bills') {
         query.type = { $in: ['game_bet', 'game_win', 'game_refund'] };
+      }
+    }
+
+    // Filter by date if provided
+    if (startDate || endDate) {
+      query.created_at = {};
+      if (startDate) {
+        query.created_at.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // End of day
+        query.created_at.$lte = end;
       }
     }
 
