@@ -3,9 +3,9 @@ const SystemSetting = require('../models/SystemSetting');
 
 // Default Limits (USDT) - Fallback if not in DB
 const DEFAULTS = {
-  MIN_DEPOSIT: 10.0,
+  MIN_DEPOSIT: 0.0001,
   MAX_DEPOSIT: 100000.0,
-  MIN_WITHDRAWAL: 10.0,
+  MIN_WITHDRAWAL: 0.0001,
   MAX_WITHDRAWAL: 50000.0
 };
 
