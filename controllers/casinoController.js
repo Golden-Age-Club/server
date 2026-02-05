@@ -145,7 +145,7 @@ const updateProviderStatus = async (req, res) => {
         return res.status(400).json({ message: "provider_id and status are required" });
     }
     
-    const result = await pgProviderService.updateProviderStatus(provider_id, status);
+    const result = await pgProviderService.updateProviderSettings(provider_id, { status });
     res.json(result);
   } catch (error) {
     console.error("Error updating provider status", error);

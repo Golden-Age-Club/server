@@ -108,13 +108,14 @@ class PGProviderService {
             return {
                 ...p,
                 db_status: setting ? setting.status : 'enabled',
+                rtp: setting ? setting.rtp : 95,
                 db_updated_at: setting ? setting.updated_at : null
             };
         });
     } catch (err) {
         console.error('Error fetching provider settings:', err);
         // Return providers with default status if DB fails
-        return data.providers.map(p => ({ ...p, db_status: 'enabled' }));
+        return data.providers.map(p => ({ ...p, db_status: 'enabled', rtp: 95 }));
     }
   }
 
@@ -369,15 +370,21 @@ class PGProviderService {
       throw error;
     }
   }
-  async updateProviderStatus(providerId, status) {
-    if (!['enabled', 'disabled'].includes(status)) {
+  async updateProviderSettings(providerId, updates) {
+    // Validate status if present
+    if (updates.status && !['enabled', 'disabled'].includes(updates.status)) {
         throw new Error('Invalid status');
     }
     
+    const updateFields = {
+        updated_at: Date.now(),
+        ...updates
+    };
+
     // Upsert the setting
     const setting = await ProviderSetting.findOneAndUpdate(
         { provider_id: providerId },
-        { status: status, updated_at: Date.now() },
+        updateFields,
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     

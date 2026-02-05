@@ -14,6 +14,10 @@ const providerSettingSchema = new mongoose.Schema({
     enum: ['enabled', 'disabled'],
     default: 'enabled'
   },
+  rtp: {
+    type: Number,
+    default: 95
+  },
   updated_at: {
     type: Date,
     default: Date.now

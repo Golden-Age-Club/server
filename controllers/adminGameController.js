@@ -159,20 +159,25 @@ exports.getProviders = async (req, res) => {
   }
 };
 
-// @desc    Toggle Provider Status
+// @desc    Update Provider Settings (Status, RTP)
 // @route   POST /api/admin/games/providers/toggle
 // @access  Private (Admin)
 exports.toggleProvider = async (req, res) => {
     try {
-        const { providerId, status } = req.body;
-        if (!providerId || !status) {
-            return res.status(400).json({ message: 'Provider ID and status required' });
-        }
+        const { providerId, status, rtp } = req.body;
         
-        const result = await pgProviderService.updateProviderStatus(providerId, status);
+        if (!providerId) {
+            return res.status(400).json({ message: 'Provider ID is required' });
+        }
+
+        const updates = {};
+        if (status) updates.status = status;
+        if (rtp !== undefined) updates.rtp = rtp;
+        
+        const result = await pgProviderService.updateProviderSettings(providerId, updates);
         res.json({ success: true, setting: result });
     } catch (error) {
-        console.error('Error toggling provider:', error);
-        res.status(500).json({ message: 'Failed to toggle provider' });
+        console.error('Error updating provider:', error);
+        res.status(500).json({ message: 'Failed to update provider' });
     }
 };
