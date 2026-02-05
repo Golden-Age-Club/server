@@ -3,9 +3,9 @@ const SystemSetting = require('../models/SystemSetting');
 
 // Default Limits (USDT) - Fallback if not in DB
 const DEFAULTS = {
-  MIN_DEPOSIT: 0.0001,
+  MIN_DEPOSIT: 10.0,
   MAX_DEPOSIT: 100000.0,
-  MIN_WITHDRAWAL: 0.0001,
+  MIN_WITHDRAWAL: 10.0,
   MAX_WITHDRAWAL: 50000.0
 };
 
@@ -23,12 +23,6 @@ const getLimit = async (key, defaultValue, label, description) => {
         description,
         is_public: true
       });
-    } else if (parseFloat(setting.value) > defaultValue && (key.includes('min_deposit') || key.includes('min_withdrawal'))) {
-      // FORCE SYNC: If the database value is still 10 but code says 0.0001, update DB.
-      // This is primarily for testnet ease-of-use.
-      setting.value = defaultValue;
-      await setting.save();
-      console.log(`[Limit Sync] Updated ${key} to ${defaultValue} to match code DEFAULTS.`);
     }
     return parseFloat(setting.value);
   } catch (err) {
