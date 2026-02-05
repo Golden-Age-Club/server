@@ -147,8 +147,42 @@ const getBalance = async (req, res) => {
   }
 };
 
+// @desc    Validate Withdrawal Address
+// @route   POST /api/wallet/validate-address
+// @access  Private
+const validateWithdrawAddress = async (req, res) => {
+  try {
+    const { address, network, crypto = 'USDT' } = req.body;
+    if (!address || !network) return res.status(400).json({ message: "Address and network are required" });
+
+    const result = await walletService.validateWithdrawAddress(address, crypto, network);
+    res.json(result);
+  } catch (error) {
+    console.error("Address validation error", error);
+    res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// @desc    Get Withdrawal Fee
+// @route   GET /api/wallet/withdraw-fee
+// @access  Private
+const getWithdrawFee = async (req, res) => {
+  try {
+    const { network, crypto = 'USDT' } = req.query;
+    if (!network) return res.status(400).json({ message: "Network is required" });
+
+    const result = await walletService.getWithdrawFee(crypto, network);
+    res.json(result);
+  } catch (error) {
+    console.error("Fee lookup error", error);
+    res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
 module.exports = {
   createDeposit,
   createWithdrawal,
-  getBalance
+  getBalance,
+  validateWithdrawAddress,
+  getWithdrawFee
 };

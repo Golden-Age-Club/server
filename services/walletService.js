@@ -16,7 +16,7 @@ class WalletService {
       type: TransactionType.DEPOSIT,
       amount: amount,
       currency: currency,
-      status: TransactionStatus.PENDING,
+      status: TransactionStatus.AWAITING_DEPOSIT,
       merchant_order_id: merchantOrderId
     });
 
@@ -32,7 +32,7 @@ class WalletService {
       });
 
       // Update transaction with payment info
-      transaction.status = TransactionStatus.PENDING; // Still pending until webhook confirms
+      transaction.status = TransactionStatus.AWAITING_DEPOSIT; // Using the more specific status
       transaction.payment_url = paymentData.paymentUrl || paymentData.payUrl; // Adjust based on actual CCPayment response key
       transaction.payment_address = paymentData.address; // If crypto deposit
       transaction.ccpayment_order_id = paymentData.orderId; // External ID
@@ -78,7 +78,7 @@ class WalletService {
         type: TransactionType.WITHDRAWAL,
         amount: amount,
         currency: currency,
-        status: TransactionStatus.PENDING, // Pending manual approval or auto-process
+        status: TransactionStatus.AWAITING_APPROVAL, // Pending manual approval
         merchant_order_id: merchantOrderId,
         wallet_address: walletAddress
       });
@@ -126,6 +126,20 @@ class WalletService {
       console.error("Payout execution error:", error);
       throw error;
     }
+  }
+
+  /**
+   * Validate Withdrawal Address
+   */
+  async validateWithdrawAddress(address, crypto = 'USDT', network = 'TRC20') {
+    return await ccPaymentService.validateAddress(address, crypto, network);
+  }
+
+  /**
+   * Get Withdrawal Fee
+   */
+  async getWithdrawFee(crypto = 'USDT', network = 'TRC20') {
+    return await ccPaymentService.getWithdrawFee(crypto, network);
   }
 }
 
