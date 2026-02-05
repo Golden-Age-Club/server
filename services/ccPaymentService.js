@@ -260,6 +260,8 @@ class CCPaymentService {
       const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
       const endpoint = '/ccpayment/v2/address/validate';
 
+      console.log(`📡 CCpayment API: Validating address [${address}] on ${network} (${crypto})`);
+
       const response = await axios.post(
         `${cleanBaseUrl}${endpoint}`,
         payload,
@@ -272,6 +274,8 @@ class CCPaymentService {
           }
         }
       );
+
+      console.log('✅ CCpayment API Response - Validate Address:', JSON.stringify(response.data));
 
       return response.data;
     } catch (error) {

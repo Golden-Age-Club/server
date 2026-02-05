@@ -490,7 +490,7 @@ class AdminController {
    */
   static async getUsers(req, res) {
     try {
-      const { page = 1, limit = 10, search = '', role, status } = req.query;
+      const { page = 1, limit = 50, search = '', role, status } = req.query;
       const skip = (page - 1) * limit;
 
       let query = {};
