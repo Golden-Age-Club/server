@@ -180,6 +180,109 @@ class CCPaymentService {
       throw error;
     }
   }
+
+  /**
+   * Get Transaction Detail from CCPayment
+   */
+  async getTransactionDetail(billId) {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const payload = { billId };
+      const bodyStr = JSON.stringify(payload);
+      const sign = this._generateV2Signature(timestamp, bodyStr);
+
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+      const endpoint = '/ccpayment/v2/getTransactionDetail';
+
+      const response = await axios.post(
+        `${cleanBaseUrl}${endpoint}`,
+        payload,
+        {
+          headers: {
+            'App-Id': this.appId,
+            'Timestamp': timestamp,
+            'Sign': sign,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Get transaction detail error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Withdraw Fee
+   */
+  async getWithdrawFee(crypto, network) {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const payload = { crypto, network };
+      const bodyStr = JSON.stringify(payload);
+      const sign = this._generateV2Signature(timestamp, bodyStr);
+
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+      const endpoint = '/ccpayment/v2/getWithdrawFee';
+
+      const response = await axios.post(
+        `${cleanBaseUrl}${endpoint}`,
+        payload,
+        {
+          headers: {
+            'App-Id': this.appId,
+            'Timestamp': timestamp,
+            'Sign': sign,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Get withdraw fee error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate Address
+   */
+  async validateAddress(address, crypto, network) {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const payload = { address, crypto, network };
+      const bodyStr = JSON.stringify(payload);
+      const sign = this._generateV2Signature(timestamp, bodyStr);
+
+      const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+      const endpoint = '/ccpayment/v2/address/validate';
+
+      console.log(`📡 CCpayment API: Validating address [${address}] on ${network} (${crypto})`);
+
+      const response = await axios.post(
+        `${cleanBaseUrl}${endpoint}`,
+        payload,
+        {
+          headers: {
+            'App-Id': this.appId,
+            'Timestamp': timestamp,
+            'Sign': sign,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('✅ CCpayment API Response - Validate Address:', JSON.stringify(response.data));
+
+      return response.data;
+    } catch (error) {
+      console.error('Validate address error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new CCPaymentService();

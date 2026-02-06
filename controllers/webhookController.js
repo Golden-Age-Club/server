@@ -59,6 +59,23 @@ exports.ccPaymentWebhook = async (req, res) => {
       return res.status(404).json({ message: 'Transaction not found' });
     }
 
+    // Fetch full details from CCPayment to get blockchain txid and fee
+    let txid = transaction.txid;
+    let fee = transaction.fee;
+    try {
+      const billId = body.order_id;
+      if (billId) {
+        const detailRes = await ccPaymentService.getTransactionDetail(billId);
+        if (detailRes.code === 10000 && detailRes.data) {
+          txid = detailRes.data.hash || detailRes.data.txid || txid;
+          fee = detailRes.data.fee || fee;
+          console.log(`Fetched details for ${merchant_order_id}: txid=${txid}, fee=${fee}`);
+        }
+      }
+    } catch (err) {
+      console.error(`Error fetching transaction details from CCPayment: ${err.message}`);
+    }
+
     // Handle Deposit
     if (transaction.type === 'deposit') {
       if (order_status === 'paid' || order_status === 'confirmed') {
@@ -70,8 +87,13 @@ exports.ccPaymentWebhook = async (req, res) => {
             $set: {
               status: 'completed',
               completed_at: new Date(),
-              webhook_data: body,
-              payment_record_id: record._id
+              webhook_data: {
+                payload: body,
+                full_details: detailRes?.data || {}
+              },
+              payment_record_id: record._id,
+              txid: txid,
+              fee: fee
             }
           },
           { new: true }
@@ -108,7 +130,9 @@ exports.ccPaymentWebhook = async (req, res) => {
               status: 'completed',
               completed_at: new Date(),
               webhook_data: body,
-              payment_record_id: record._id
+              payment_record_id: record._id,
+              txid: txid,
+              fee: fee
             }
           }
         );

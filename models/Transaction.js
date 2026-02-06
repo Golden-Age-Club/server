@@ -11,6 +11,8 @@ const TransactionType = {
 
 const TransactionStatus = {
   PENDING: 'pending',
+  AWAITING_DEPOSIT: 'awaiting_deposit',
+  AWAITING_APPROVAL: 'awaiting_approval',
   PROCESSING: 'processing',
   COMPLETED: 'completed',
   FAILED: 'failed',
@@ -67,6 +69,16 @@ const transactionSchema = new mongoose.Schema({
     type: String
   },
   ccpayment_order_id: {
+    type: String
+  },
+  txid: {
+    type: String
+  },
+  fee: {
+    type: Number,
+    default: 0
+  },
+  network: {
     type: String
   },
   error_message: {
