@@ -48,6 +48,7 @@ const supportRoutes = require('./routes/supportRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const financeRoutes = require('./routes/financeRoutes');
+const translationRoutes = require('./routes/translationRoutes');
 const AdminController = require('./controllers/adminController');
 
 // Routes
@@ -59,6 +60,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/finance', financeRoutes);
+app.use('/api/translate', translationRoutes);
 app.use('/api', webhookRoutes);
 
 app.get('/', (req, res) => {
